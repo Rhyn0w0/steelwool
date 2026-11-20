@@ -123,9 +123,9 @@ The first `runGameTest` or `build` also builds the test mod. This runs NeoForge'
 2. Starts a fresh Fabric dedicated server with SteelWool and only that mod in `mods/neoforge/`.
 3. Records whether the server finishes starting. If it doesn't, it records why: a missing NeoForge API, a failed mixin, a missing dependency or a crash.
 
-To run it, use `./gradlew testBundle && python3 compat/compat_check.py [slug ...]`. It needs Python 3.10+ and Java 25. The results go to `build/compat/report.md`, with one log per mod.
+To run it, use `./gradlew testBundle && python3 compat/compat_check.py [slug ...]`. It needs Python 3.10+ and Java 25. The results go to `build/compat/report.md`, with one log per mod. To test the checker itself, run `python3 -m unittest discover compat`.
 
-The [compat workflow](.github/workflows/compat.yml) runs on pushes to `main`, every Monday and on demand. The report appears in the run summary. The workflow fails only if a mod marked `"expect": "pass"` stops loading. When the report shows a new mod passing, set its `expect` to `pass`. The "Missing NeoForge APIs" table at the end of the report is the to-do list for SteelWool.
+The [compat workflow](.github/workflows/compat.yml) runs on pull requests, on pushes to `main`, every Monday and on demand. The report appears in the run summary. The workflow fails only if a mod marked `"expect": "pass"` stops loading. When the report shows a new mod passing, set its `expect` to `pass`. The "Missing NeoForge APIs" table at the end of the report is the to-do list for SteelWool.
 
 ### Releasing
 
