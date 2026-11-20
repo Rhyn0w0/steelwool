@@ -3,6 +3,7 @@
 # "expect": "pass" stops loading.
 name: compat
 on:
+  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
@@ -20,6 +21,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
       - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
@@ -27,8 +30,16 @@ jobs:
           distribution: 'microsoft'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: Test the compat checker
+        run: python3 -m unittest discover compat
       - name: Build test bundle
         run: ./gradlew testBundle
+      - name: Cache mod downloads
+        uses: actions/cache@v4
+        with:
+          path: build/compat/downloads
+          key: compat-downloads-${{ hashFiles('compat/mods.json') }}-${{ github.run_id }}
+          restore-keys: compat-downloads-
       - name: Check NeoForge mods
         run: python3 compat/compat_check.py
       - name: Upload report and logs
