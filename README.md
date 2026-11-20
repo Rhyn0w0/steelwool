@@ -28,9 +28,9 @@ Fabric only scans the top level of `mods/`, so it never sees the jars in `mods/n
 Verified:
 
 - NeoForge's official example mod (the [26.3 MDK](https://github.com/NeoForgeMDKs/MDK-26.3-ModDevGradle)), built unmodified with NeoForge's own tooling, loads and runs on a Fabric dedicated server. This covers its block, item, creative tab, config file, common setup and server-starting event.
-- The project's test mod ([`testmod/`](testmod/)) passes 14 automated in-game tests on a dedicated server: registration, lifecycle events, game events, `@EventBusSubscriber`, config, data packs, commands, mod file metadata, payload registration and a mixin from the NeoForge mod.
+- The project's test mod ([`testmod/`](testmod/)) passes 15 automated in-game tests on a dedicated server: registration, lifecycle events, game events, permissions, `@EventBusSubscriber`, config, data packs, commands, mod file metadata, payload registration and a mixin from the NeoForge mod.
 - The built `steelwool-0.1.0.jar` works in a real (non-development) Fabric server install.
-- 9 of 35 popular NeoForge mods from Modrinth start on a dedicated server: Cloth Config, Vein Miner, No Chat Reports, Kotlin for Forge, FerriteCore, GeckoLib, AppleSkin, JEI and Clumps. "Start" means the server finishes starting with the mod loaded; it does not mean every feature of the mod works. See [Compatibility with real mods](#compatibility-with-real-mods).
+- 13 of 35 popular NeoForge mods from Modrinth start on a dedicated server: Cloth Config, Vein Miner, No Chat Reports, Kotlin for Forge, FerriteCore, GeckoLib, AppleSkin, JEI, Clumps, Simple Voice Chat, Nature's Compass, spark and Chunky. "Start" means the server finishes starting with the mod loaded; it does not mean every feature of the mod works. See [Compatibility with real mods](#compatibility-with-real-mods).
 
 Not yet verified: the client. SteelWool loads NeoForge mods and their resource packs on the client, but the automated client test (`runClientGameTest`) could not render a window in the environment where it was developed.
 
@@ -97,6 +97,7 @@ Game events on `NeoForge.EVENT_BUS` ([`GameplayEventBridge`](src/main/java/dev/s
 | Resources | Mod `assets/` and `data/` as built-in packs | Pack overlays and `pack.mcmeta` features |
 | Patched Minecraft | `CreativeModeTab.builder()` and NeoForge's `CreativeModeTab.Builder` methods (tab ordering and styling are accepted but not applied) | The other ~1,400 NeoForge additions and extension interfaces (`IItemExtension`, `IBlockExtension`, …) |
 | Networking | `RegisterPayloadHandlersEvent`, `PayloadRegistrar` (play, configuration and common payloads), `IPayloadContext`, `PacketDistributor`, `ClientPacketDistributor`, `RegisterClientPayloadHandlersEvent`, on top of Fabric's networking API | Version and `optional()` negotiation, network-thread handlers (they run on the main thread), configuration tasks |
+| Permissions | `PermissionAPI`, `PermissionGatherEvent` (`Nodes`, `Handler`), `PermissionNode`, `PermissionTypes`, dynamic contexts, `DefaultPermissionHandler` (initialized when the server starts) | Choosing another handler through NeoForge's server config |
 | Other NeoForge systems | | Capabilities, data attachments, fluids (`FluidType`), client rendering/model hooks, key mappings, data generation |
 
 ## Installing

@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import net.neoforged.neoforge.server.permission.PermissionAPI;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
@@ -25,6 +26,7 @@ public final class GameEventBridge {
 	public static void register() {
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
 			ServerLifecycleHooks.steelwool$setCurrentServer(server);
+			PermissionAPI.initializePermissionAPI();
 			NeoForge.EVENT_BUS.post(new ServerAboutToStartEvent(server));
 		});
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {

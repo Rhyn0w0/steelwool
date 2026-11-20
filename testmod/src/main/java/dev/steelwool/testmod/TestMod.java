@@ -28,6 +28,9 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.server.permission.events.PermissionGatherEvent;
+import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
+import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -59,6 +62,9 @@ public class TestMod {
 			.displayItems((parameters, output) -> output.accept(TEST_ITEM.get()))
 			.build());
 
+	public static final PermissionNode<Integer> TEST_PERMISSION = new PermissionNode<>(MODID, "test_permission", PermissionTypes.INTEGER,
+			(player, uuid, contexts) -> 42);
+
 	public TestMod(IEventBus modEventBus, ModContainer modContainer) {
 		modEventBus.addListener(this::commonSetup);
 		modEventBus.addListener(FMLConstructModEvent.class, event -> TestModState.constructEventFired = true);
@@ -75,6 +81,7 @@ public class TestMod {
 		NeoForge.EVENT_BUS.register(this);
 		NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, event -> TestModState.serverTickFired = true);
 		NeoForge.EVENT_BUS.addListener(LevelEvent.Load.class, event -> TestModState.levelLoadFired = true);
+		NeoForge.EVENT_BUS.addListener(PermissionGatherEvent.Nodes.class, event -> event.addNodes(TEST_PERMISSION));
 		modEventBus.addListener(this::addCreative);
 		modEventBus.addListener(TestPayload::register);
 		modContainer.registerConfig(ModConfig.Type.LOCAL, TestModConfig.SPEC);

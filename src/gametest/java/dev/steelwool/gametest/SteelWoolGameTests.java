@@ -20,6 +20,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.fml.loading.LoadingModList;
+import net.neoforged.neoforge.server.permission.PermissionAPI;
+import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.neoforged.neoforgespi.language.IModFileInfo;
 import net.neoforged.neoforgespi.language.IModInfo;
 import org.objectweb.asm.Type;
@@ -94,6 +96,16 @@ public class SteelWoolGameTests {
 	public void gameEventsFire(GameTestHelper helper) {
 		assertFlag(helper, "serverTickFired");
 		assertFlag(helper, "levelLoadFired");
+		helper.succeed();
+	}
+
+	/** The mod's permission node is registered through PermissionGatherEvent and resolves to its default. */
+	@GameTest
+	public void permissionNodeResolves(GameTestHelper helper) {
+		@SuppressWarnings("unchecked")
+		PermissionNode<Integer> node = (PermissionNode<Integer>) testModField("TestMod", "TEST_PERMISSION");
+		helper.assertTrue(PermissionAPI.getRegisteredNodes().contains(node), Component.literal("Permission node is not registered"));
+		helper.assertTrue(PermissionAPI.getOfflinePermission(java.util.UUID.randomUUID(), node) == 42, Component.literal("Permission did not resolve to 42"));
 		helper.succeed();
 	}
 
