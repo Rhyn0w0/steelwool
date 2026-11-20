@@ -18,6 +18,11 @@ import net.minecraft.resources.RegistryOps;
  */
 public class ConditionalOps<T extends Object> extends RegistryOps<T> {
 	private final ICondition.IContext context;
+	/** The context conditions decoded with these ops are tested in. */
+	ICondition.IContext conditionContext() {
+		return context;
+	}
+
 	public static final String DEFAULT_CONDITIONS_KEY = "neoforge:conditions";
 	public static final String CONDITIONAL_VALUE_KEY = "neoforge:value";
 

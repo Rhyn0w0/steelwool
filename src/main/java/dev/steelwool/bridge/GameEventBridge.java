@@ -26,6 +26,7 @@ public final class GameEventBridge {
 	public static void register() {
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
 			ServerLifecycleHooks.steelwool$setCurrentServer(server);
+			dev.steelwool.config.SteelWoolConfigs.loadSynced();
 			PermissionAPI.initializePermissionAPI();
 			NeoForge.EVENT_BUS.post(new ServerAboutToStartEvent(server));
 		});

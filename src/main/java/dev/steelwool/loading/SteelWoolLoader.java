@@ -21,7 +21,7 @@ import dev.steelwool.discovery.AnnotationScanResult;
 import dev.steelwool.discovery.NeoForgeModDiscovery;
 import dev.steelwool.discovery.NeoForgeModFile;
 import dev.steelwool.discovery.NeoForgeModMetadata;
-import dev.steelwool.registry.VanillaFluidTypes;
+import dev.steelwool.registry.NeoForgeBuiltIns;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.impl.FabricLoaderImpl;
 import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweakerReader;
@@ -337,7 +337,7 @@ public final class SteelWoolLoader {
 	 */
 	private void fireNewRegistryEvent() {
 		callHidden(NewRegistryEvent.class, null, "registerNeoForgeRegistries");
-		VanillaFluidTypes.register();
+		NeoForgeBuiltIns.register();
 		NewRegistryEvent event = construct(NewRegistryEvent.class);
 		postToAllModBuses(event);
 		callHidden(NewRegistryEvent.class, event, "fill");

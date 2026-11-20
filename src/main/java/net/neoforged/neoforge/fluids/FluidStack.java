@@ -1,10 +1,15 @@
 package net.neoforged.neoforge.fluids;
 
-import java.util.List;
-import java.util.function.Predicate;
-
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import io.netty.handler.codec.DecoderException;
+import io.netty.handler.codec.EncoderException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Predicate;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentPatch;
@@ -14,220 +19,319 @@ import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.common.MutableDataComponentHolder;
+import org.jspecify.annotations.Nullable;
 
 /**
- * SteelWool re-implementation of NeoForge's {@code FluidStack}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
+ * An amount of fluid with data components, the fluid counterpart of {@code ItemStack}. Amounts are in
+ * millibuckets ({@link FluidType#BUCKET_VOLUME} is one bucket). {@link #EMPTY} is the only empty
+ * stack instance that should be shared; a stack with a non-positive amount also counts as empty.
  */
-public final class FluidStack implements MutableDataComponentHolder,FluidInstance {
-	public static final MapCodec<net.neoforged.neoforge.fluids.FluidStack> MAP_CODEC = null /* SteelWool: TODO */;
-	public static final Codec<net.neoforged.neoforge.fluids.FluidStack> CODEC = null /* SteelWool: TODO */;
-	public static final Codec<net.neoforged.neoforge.fluids.FluidStack> OPTIONAL_CODEC = null /* SteelWool: TODO */;
-	public static final StreamCodec<RegistryFriendlyByteBuf, net.neoforged.neoforge.fluids.FluidStack> OPTIONAL_STREAM_CODEC = null /* SteelWool: TODO */;
-	public static final StreamCodec<RegistryFriendlyByteBuf, net.neoforged.neoforge.fluids.FluidStack> STREAM_CODEC = null /* SteelWool: TODO */;
-	public static final net.neoforged.neoforge.fluids.FluidStack EMPTY = null /* SteelWool: TODO */;
+public final class FluidStack implements MutableDataComponentHolder, FluidInstance {
+	/** {@code {"id": fluid, "amount": n, "components": {...}}}; the amount must be positive. */
+	public static final MapCodec<FluidStack> MAP_CODEC = MapCodec.recursive("FluidStack", self -> RecordCodecBuilder.mapCodec(instance -> instance.group(
+			FLUID_HOLDER_CODEC_WITH_BOUND_COMPONENTS.fieldOf(FIELD_ID).forGetter(FluidStack::typeHolder),
+			ExtraCodecs.POSITIVE_INT.fieldOf(FIELD_AMOUNT).forGetter(FluidStack::getAmount),
+			DataComponentPatch.CODEC.optionalFieldOf(FIELD_COMPONENTS, DataComponentPatch.EMPTY).forGetter(stack -> stack.components.asPatch()))
+			.apply(instance, FluidStack::new)));
+	public static final Codec<FluidStack> CODEC = Codec.lazyInitialized(MAP_CODEC::codec);
+	/** Like {@link #CODEC}, but an empty map decodes to {@link #EMPTY} and {@link #EMPTY} encodes to one. */
+	public static final Codec<FluidStack> OPTIONAL_CODEC = ExtraCodecs.optionalEmptyMap(CODEC)
+			.xmap(optional -> optional.orElse(FluidStack.EMPTY), stack -> stack.isEmpty() ? Optional.empty() : Optional.of(stack));
+	/** Amount, then (if positive) fluid and component patch; an amount of 0 means empty. */
+	public static final StreamCodec<RegistryFriendlyByteBuf, FluidStack> OPTIONAL_STREAM_CODEC = new StreamCodec<>() {
+		@Override
+		public FluidStack decode(RegistryFriendlyByteBuf buf) {
+			int amount = buf.readVarInt();
+			if (amount <= 0) {
+				return EMPTY;
+			}
+			Holder<Fluid> fluid = FLUID_HOLDER_STREAM_CODEC.decode(buf);
+			DataComponentPatch patch = DataComponentPatch.STREAM_CODEC.decode(buf);
+			return new FluidStack(fluid, amount, patch);
+		}
+
+		@Override
+		public void encode(RegistryFriendlyByteBuf buf, FluidStack stack) {
+			if (stack.isEmpty()) {
+				buf.writeVarInt(0);
+				return;
+			}
+			buf.writeVarInt(stack.getAmount());
+			FLUID_HOLDER_STREAM_CODEC.encode(buf, stack.typeHolder());
+			DataComponentPatch.STREAM_CODEC.encode(buf, stack.components.asPatch());
+		}
+	};
+	/** {@link #OPTIONAL_STREAM_CODEC}, but empty stacks are an error. */
+	public static final StreamCodec<RegistryFriendlyByteBuf, FluidStack> STREAM_CODEC = new StreamCodec<>() {
+		@Override
+		public FluidStack decode(RegistryFriendlyByteBuf buf) {
+			FluidStack stack = OPTIONAL_STREAM_CODEC.decode(buf);
+			if (stack.isEmpty()) {
+				throw new DecoderException("Empty FluidStack not allowed");
+			}
+			return stack;
+		}
+
+		@Override
+		public void encode(RegistryFriendlyByteBuf buf, FluidStack stack) {
+			if (stack.isEmpty()) {
+				throw new EncoderException("Empty FluidStack not allowed");
+			}
+			OPTIONAL_STREAM_CODEC.encode(buf, stack);
+		}
+	};
+	public static final FluidStack EMPTY = new FluidStack((Void) null);
+
 	private int amount;
 	private final Holder<Fluid> fluid;
 	private final PatchedDataComponentMap components;
 
-	public static Codec<net.neoforged.neoforge.fluids.FluidStack> fixedAmountCodec(int arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.fixedAmountCodec yet");
+	/** A codec for stacks of exactly {@code amount}, which is not written. */
+	public static Codec<FluidStack> fixedAmountCodec(int amount) {
+		return Codec.lazyInitialized(() -> RecordCodecBuilder.create(instance -> instance.group(
+				FLUID_HOLDER_CODEC.fieldOf(FIELD_ID).forGetter(FluidStack::typeHolder),
+				DataComponentPatch.CODEC.optionalFieldOf(FIELD_COMPONENTS, DataComponentPatch.EMPTY).forGetter(stack -> stack.components.asPatch()))
+				.apply(instance, (fluid, patch) -> new FluidStack(fluid, amount, patch))));
 	}
 
+	@Override
 	public DataComponentMap getComponents() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getComponents yet");
+		return components;
 	}
 
+	/** The fluid's default components, before this stack's changes. */
 	public DataComponentMap getPrototype() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getPrototype yet");
+		return isEmpty() ? DataComponentMap.EMPTY : prototype(fluid);
 	}
 
 	public DataComponentPatch getComponentsPatch() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getComponentsPatch yet");
+		return isEmpty() ? DataComponentPatch.EMPTY : components.asPatch();
 	}
 
 	public DataComponentMap immutableComponents() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.immutableComponents yet");
+		return isEmpty() ? DataComponentMap.EMPTY : components.toImmutableMap();
 	}
 
-	public boolean hasNonDefault(DataComponentType<?> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.hasNonDefault yet");
+	public boolean hasNonDefault(DataComponentType<?> type) {
+		return !isEmpty() && components.hasNonDefault(type);
 	}
 
 	public boolean isComponentsPatchEmpty() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.isComponentsPatchEmpty yet");
+		return isEmpty() || components.asPatch().isEmpty();
 	}
 
-	public FluidStack(Fluid arg0, int arg1, DataComponentPatch arg2) {
-		this((Holder) null, (int) 0, (DataComponentPatch) null);
-		throw new UnsupportedOperationException("SteelWool does not implement the FluidStack constructor yet");
+	public FluidStack(Fluid fluid, int amount, DataComponentPatch patch) {
+		this(fluid.builtInRegistryHolder(), amount, patch);
 	}
 
-	public FluidStack(Fluid arg0, int arg1) {
-		this((Fluid) null, (int) 0, (DataComponentPatch) null);
-		throw new UnsupportedOperationException("SteelWool does not implement the FluidStack constructor yet");
+	public FluidStack(Fluid fluid, int amount) {
+		this(fluid.builtInRegistryHolder(), amount);
 	}
 
-	public FluidStack(Holder<Fluid> arg0, int arg1) {
-		this((Holder) null, (int) 0, (DataComponentPatch) null);
-		throw new UnsupportedOperationException("SteelWool does not implement the FluidStack constructor yet");
+	public FluidStack(Holder<Fluid> fluid, int amount) {
+		this(fluid, amount, new PatchedDataComponentMap(prototype(fluid)));
 	}
 
-	public FluidStack(Holder<Fluid> arg0, int arg1, DataComponentPatch arg2) {
-		this((Holder) null, (int) 0, (PatchedDataComponentMap) null);
-		throw new UnsupportedOperationException("SteelWool does not implement the FluidStack constructor yet");
+	public FluidStack(Holder<Fluid> fluid, int amount, DataComponentPatch patch) {
+		this(fluid, amount, PatchedDataComponentMap.fromPatch(prototype(fluid), patch));
 	}
 
 	private FluidStack(Holder<Fluid> fluid, int amount, PatchedDataComponentMap components) {
-		super();
-		this.fluid = fluid;
+		this.fluid = Objects.requireNonNull(fluid, "fluid");
 		this.amount = amount;
 		this.components = components;
 	}
 
-	private FluidStack(Void arg0) {
-		super();
-		throw new UnsupportedOperationException("SteelWool does not implement the FluidStack constructor yet");
+	private FluidStack(@Nullable Void unused) {
+		this.fluid = Fluids.EMPTY.builtInRegistryHolder();
+		this.amount = 0;
+		this.components = new PatchedDataComponentMap(DataComponentMap.EMPTY);
+	}
+
+	private static DataComponentMap prototype(Holder<Fluid> fluid) {
+		return fluid.areComponentsBound() ? fluid.components() : DataComponentMap.EMPTY;
 	}
 
 	public boolean isEmpty() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.isEmpty yet");
+		return this == EMPTY || fluid.value() == Fluids.EMPTY || amount <= 0;
 	}
 
-	public net.neoforged.neoforge.fluids.FluidStack split(int arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.split yet");
+	/** Takes up to {@code amount} out of this stack and returns it as a new stack. */
+	public FluidStack split(int amount) {
+		int taken = Math.min(amount, this.amount);
+		FluidStack result = copyWithAmount(taken);
+		shrink(taken);
+		return result;
 	}
 
-	public net.neoforged.neoforge.fluids.FluidStack copyAndClear() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.copyAndClear yet");
+	public FluidStack copyAndClear() {
+		if (isEmpty()) {
+			return EMPTY;
+		}
+		FluidStack result = copy();
+		setAmount(0);
+		return result;
 	}
 
 	public Fluid getFluid() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getFluid yet");
+		return isEmpty() ? Fluids.EMPTY : fluid.value();
 	}
 
+	@Override
 	public Holder<Fluid> typeHolder() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.typeHolder yet");
+		return isEmpty() ? Fluids.EMPTY.builtInRegistryHolder() : fluid;
 	}
 
-	public boolean is(Predicate<Holder<Fluid>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.is yet");
+	public boolean is(Predicate<Holder<Fluid>> predicate) {
+		return predicate.test(typeHolder());
 	}
 
-	public net.neoforged.neoforge.fluids.FluidStack copy() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.copy yet");
+	public FluidStack copy() {
+		return isEmpty() ? EMPTY : new FluidStack(fluid, amount, components.copy());
 	}
 
-	public net.neoforged.neoforge.fluids.FluidStack copyWithAmount(int arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.copyWithAmount yet");
+	public FluidStack copyWithAmount(int amount) {
+		if (isEmpty()) {
+			return EMPTY;
+		}
+		FluidStack copy = copy();
+		copy.setAmount(amount);
+		return copy;
 	}
 
-	public net.neoforged.neoforge.fluids.FluidStack transmuteCopy(Fluid arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.transmuteCopy yet");
+	/** A copy with the same amount and component changes, but a different fluid. */
+	public FluidStack transmuteCopy(Fluid newFluid) {
+		return transmuteCopy(newFluid, amount);
 	}
 
-	public net.neoforged.neoforge.fluids.FluidStack transmuteCopy(Fluid arg0, int arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.transmuteCopy yet");
+	public FluidStack transmuteCopy(Fluid newFluid, int newAmount) {
+		return isEmpty() ? EMPTY : transmuteCopyIgnoreEmpty(newFluid, newAmount);
 	}
 
-	private net.neoforged.neoforge.fluids.FluidStack transmuteCopyIgnoreEmpty(Fluid arg0, int arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.transmuteCopyIgnoreEmpty yet");
+	private FluidStack transmuteCopyIgnoreEmpty(Fluid newFluid, int newAmount) {
+		return new FluidStack(newFluid.builtInRegistryHolder(), newAmount, components.asPatch());
 	}
 
-	public static boolean matches(net.neoforged.neoforge.fluids.FluidStack arg0, net.neoforged.neoforge.fluids.FluidStack arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.matches yet");
+	/** Same fluid, components and amount. */
+	public static boolean matches(FluidStack first, FluidStack second) {
+		if (first == second) {
+			return true;
+		}
+		return first.getAmount() == second.getAmount() && isSameFluidSameComponents(first, second);
 	}
 
-	public static boolean matches(net.neoforged.neoforge.fluids.FluidStack arg0, FluidStackTemplate arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.matches yet");
+	public static boolean matches(FluidStack stack, FluidStackTemplate template) {
+		return stack.getAmount() == template.amount() && isSameFluidSameComponents(stack, template);
 	}
 
-	public static boolean isSameFluid(net.neoforged.neoforge.fluids.FluidStack arg0, net.neoforged.neoforge.fluids.FluidStack arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.isSameFluid yet");
+	public static boolean isSameFluid(FluidStack first, FluidStack second) {
+		return first.getFluid() == second.getFluid();
 	}
 
-	public static boolean isSameFluidSameComponents(net.neoforged.neoforge.fluids.FluidStack arg0, net.neoforged.neoforge.fluids.FluidStack arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.isSameFluidSameComponents yet");
+	public static boolean isSameFluidSameComponents(FluidStack first, FluidStack second) {
+		if (!isSameFluid(first, second)) {
+			return false;
+		}
+		return first.isEmpty() && second.isEmpty() || Objects.equals(first.components, second.components);
 	}
 
-	public static boolean isSameFluid(net.neoforged.neoforge.fluids.FluidStack arg0, FluidStackTemplate arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.isSameFluid yet");
+	public static boolean isSameFluid(FluidStack stack, FluidStackTemplate template) {
+		return stack.getFluid() == template.fluid().value();
 	}
 
-	public static boolean isSameFluidSameComponents(net.neoforged.neoforge.fluids.FluidStack arg0, FluidStackTemplate arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.isSameFluidSameComponents yet");
+	public static boolean isSameFluidSameComponents(FluidStack stack, FluidStackTemplate template) {
+		return isSameFluid(stack, template) && stack.getComponentsPatch().equals(template.components());
 	}
 
-	public static MapCodec<net.neoforged.neoforge.fluids.FluidStack> lenientOptionalFieldOf(String arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.lenientOptionalFieldOf yet");
+	/** An optional field that reads a missing or invalid stack as {@link #EMPTY}. */
+	public static MapCodec<FluidStack> lenientOptionalFieldOf(String name) {
+		return CODEC.lenientOptionalFieldOf(name).xmap(optional -> optional.orElse(FluidStack.EMPTY), stack -> stack.isEmpty() ? Optional.empty() : Optional.of(stack));
 	}
 
-	public static int hashFluidAndComponents(net.neoforged.neoforge.fluids.FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.hashFluidAndComponents yet");
+	public static int hashFluidAndComponents(@Nullable FluidStack stack) {
+		if (stack == null) {
+			return 0;
+		}
+		return 31 * stack.getFluid().hashCode() + stack.getComponents().hashCode();
 	}
 
 	public String getDescriptionId() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getDescriptionId yet");
+		return getFluidType().getDescriptionId(this);
 	}
 
+	@Override
 	public String toString() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.toString yet");
+		return getAmount() + " " + getFluid();
 	}
 
-	public List<Component> getTooltipLines(Item.TooltipContext arg0, Player arg1, TooltipFlag arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getTooltipLines yet");
+	public List<Component> getTooltipLines(Item.TooltipContext context, @Nullable Player player, TooltipFlag flag) {
+		List<Component> lines = new ArrayList<>();
+		lines.add(getHoverName());
+		return lines;
 	}
 
-	public <T extends Object> T set(DataComponentType<T> arg0, T arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.set yet");
+	@Override
+	public <T> @Nullable T set(DataComponentType<T> type, @Nullable T value) {
+		return components.set(type, value);
 	}
 
-	public <T extends Object> T set(TypedDataComponent<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.set yet");
+	public <T> @Nullable T set(TypedDataComponent<T> component) {
+		return components.set(component);
 	}
 
-	public <T extends Object> T remove(DataComponentType<? extends T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.remove yet");
+	@Override
+	public <T> @Nullable T remove(DataComponentType<? extends T> type) {
+		return components.remove(type);
 	}
 
-	public void applyComponents(DataComponentPatch arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.applyComponents yet");
+	@Override
+	public void applyComponents(DataComponentPatch patch) {
+		components.applyPatch(patch);
 	}
 
-	public void applyComponents(DataComponentMap arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.applyComponents yet");
+	@Override
+	public void applyComponents(DataComponentMap map) {
+		components.setAll(map);
 	}
 
 	public Component getHoverName() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getHoverName yet");
+		return getFluidType().getDescription(this);
 	}
 
+	@Override
 	public int amount() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.amount yet");
+		return getAmount();
 	}
 
 	public int getAmount() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.getAmount yet");
+		return isEmpty() ? 0 : amount;
 	}
 
 	public void setAmount(int amount) {
+		if (this == EMPTY) {
+			throw new UnsupportedOperationException("Cannot change the amount of FluidStack.EMPTY");
+		}
 		this.amount = amount;
 	}
 
-	public void limitSize(int arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.limitSize yet");
+	public void limitSize(int maxAmount) {
+		if (!isEmpty() && amount > maxAmount) {
+			setAmount(maxAmount);
+		}
 	}
 
-	public void grow(int arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.grow yet");
+	public void grow(int amount) {
+		setAmount(this.amount + amount);
 	}
 
-	public void shrink(int arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStack.shrink yet");
+	public void shrink(int amount) {
+		grow(-amount);
 	}
 }

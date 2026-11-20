@@ -44,4 +44,12 @@ public final class StaticPatches {
 	public static Set<Block> blockEntityTypeBlocks(Set<Block> blocks, boolean onlyOpCanSetNbt) {
 		return blocks;
 	}
+
+	/**
+	 * The data fixer for NeoForge's {@code SavedDataType(id, constructor, codec)}: none, so the data is
+	 * not upgraded ({@code SavedDataStorageMixin} skips fixing).
+	 */
+	public static net.minecraft.util.datafix.@org.jspecify.annotations.Nullable DataFixTypes noDataFixType() {
+		return null;
+	}
 }

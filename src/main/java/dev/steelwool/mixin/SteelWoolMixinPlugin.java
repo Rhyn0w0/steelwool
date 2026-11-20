@@ -51,7 +51,10 @@ public final class SteelWoolMixinPlugin implements IMixinConfigPlugin {
 			"net.minecraft.world.level.block.entity.BlockEntityType", List.of(
 					new Constructor("(" + BLOCK_ENTITY_SUPPLIER + "[Lnet/minecraft/world/level/block/Block;)V", 1, "blockEntityTypeBlocks", "(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;)V"),
 					new Constructor("(" + BLOCK_ENTITY_SUPPLIER + "Z[Lnet/minecraft/world/level/block/Block;)V", 1, "blockEntityTypeBlocks", "(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;)V"),
-					new Constructor("(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;Z)V", 1, "blockEntityTypeBlocks", "(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;)V")));
+					new Constructor("(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;Z)V", 1, "blockEntityTypeBlocks", "(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;)V")),
+			"net.minecraft.world.level.saveddata.SavedDataType", List.of(
+					new Constructor("(Lnet/minecraft/resources/Identifier;Ljava/util/function/Supplier;Lcom/mojang/serialization/Codec;)V", 3, "noDataFixType",
+							"(Lnet/minecraft/resources/Identifier;Ljava/util/function/Supplier;Lcom/mojang/serialization/Codec;Lnet/minecraft/util/datafix/DataFixTypes;)V")));
 
 	@Override
 	public void onLoad(String mixinPackage) {
@@ -113,14 +116,12 @@ public final class SteelWoolMixinPlugin implements IMixinConfigPlugin {
 			if (i >= constructor.kept()) {
 				adapterArgs.append(args[i].getDescriptor());
 			}
-
-			if (i == args.length - 1 && args.length > constructor.kept()) {
-				Type[] targetArgs = Type.getArgumentTypes(constructor.target());
-				String adapterDescriptor = adapterArgs + ")" + targetArgs[targetArgs.length - 1].getDescriptor();
-				node.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, FORWARD_OWNER, constructor.adapter(), adapterDescriptor, false));
-			}
 		}
 
+		// The adapter turns the arguments after the kept ones (possibly none) into the target's last argument.
+		Type[] targetArgs = Type.getArgumentTypes(constructor.target());
+		String adapterDescriptor = adapterArgs + ")" + targetArgs[targetArgs.length - 1].getDescriptor();
+		node.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, FORWARD_OWNER, constructor.adapter(), adapterDescriptor, false));
 		node.instructions.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, owner, "<init>", constructor.target(), false));
 		node.instructions.add(new InsnNode(Opcodes.RETURN));
 		node.maxLocals = slot;

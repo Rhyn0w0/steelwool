@@ -14,9 +14,19 @@ import net.minecraft.world.level.material.Fluid;
  * Members that throw {@link UnsupportedOperationException} are not implemented yet.
  */
 public record FluidStackTemplate(Holder<Fluid> fluid, int amount, DataComponentPatch components) implements FluidInstance {
-	public static final MapCodec<net.neoforged.neoforge.fluids.FluidStackTemplate> MAP_CODEC = null /* SteelWool: TODO */;
-	public static final Codec<net.neoforged.neoforge.fluids.FluidStackTemplate> CODEC = null /* SteelWool: TODO */;
-	public static final StreamCodec<RegistryFriendlyByteBuf, net.neoforged.neoforge.fluids.FluidStackTemplate> STREAM_CODEC = null /* SteelWool: TODO */;
+	public static final MapCodec<net.neoforged.neoforge.fluids.FluidStackTemplate> MAP_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(instance -> instance.group(
+			FLUID_HOLDER_CODEC.fieldOf(FIELD_ID).forGetter(FluidStackTemplate::fluid),
+			net.minecraft.util.ExtraCodecs.POSITIVE_INT.fieldOf(FIELD_AMOUNT).forGetter(FluidStackTemplate::amount),
+			DataComponentPatch.CODEC.optionalFieldOf(FIELD_COMPONENTS, DataComponentPatch.EMPTY).forGetter(FluidStackTemplate::components))
+			.apply(instance, FluidStackTemplate::new));
+	/** The map form, or just a fluid name for one bucket of it. */
+	public static final Codec<net.neoforged.neoforge.fluids.FluidStackTemplate> CODEC = Codec.withAlternative(MAP_CODEC.codec(), FLUID_HOLDER_CODEC,
+			fluid -> new FluidStackTemplate(fluid, FluidType.BUCKET_VOLUME));
+	public static final StreamCodec<RegistryFriendlyByteBuf, net.neoforged.neoforge.fluids.FluidStackTemplate> STREAM_CODEC = StreamCodec.composite(
+			FLUID_HOLDER_STREAM_CODEC, FluidStackTemplate::fluid,
+			net.minecraft.network.codec.ByteBufCodecs.VAR_INT, FluidStackTemplate::amount,
+			DataComponentPatch.STREAM_CODEC, FluidStackTemplate::components,
+			FluidStackTemplate::new);
 
 	public FluidStackTemplate(Holder<Fluid> arg0, int arg1) {
 		this(arg0, arg1, DataComponentPatch.EMPTY);
@@ -31,15 +41,18 @@ public record FluidStackTemplate(Holder<Fluid> fluid, int amount, DataComponentP
 	}
 
 	public static net.neoforged.neoforge.fluids.FluidStackTemplate fromNonEmptyStack(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStackTemplate.fromNonEmptyStack yet");
+		if (arg0.isEmpty()) {
+			throw new IllegalArgumentException("FluidStack must not be empty");
+		}
+		return new FluidStackTemplate(arg0.typeHolder(), arg0.getAmount(), arg0.getComponentsPatch());
 	}
 
 	public net.neoforged.neoforge.fluids.FluidStackTemplate withAmount(int arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStackTemplate.withAmount yet");
+		return new FluidStackTemplate(fluid, arg0, components);
 	}
 
 	public FluidStack create() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidStackTemplate.create yet");
+		return new FluidStack(fluid, amount, components);
 	}
 
 	public FluidStack apply(DataComponentPatch arg0) {

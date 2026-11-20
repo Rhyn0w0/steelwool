@@ -1,8 +1,7 @@
 package net.neoforged.neoforge.fluids;
 
-import java.util.function.Predicate;
-
 import com.mojang.serialization.Codec;
+import java.util.function.Predicate;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.component.DataComponentHolder;
@@ -13,97 +12,101 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.material.Fluid;
 
 /**
- * SteelWool re-implementation of NeoForge's {@code SimpleFluidContent}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
+ * An immutable copy of a {@link FluidStack}, for use as a data component value (stacks are mutable,
+ * component values must not be).
  */
 public class SimpleFluidContent implements DataComponentHolder {
-	public static final net.neoforged.neoforge.fluids.SimpleFluidContent EMPTY = null /* SteelWool: TODO */;
-	public static final Codec<net.neoforged.neoforge.fluids.SimpleFluidContent> CODEC = null /* SteelWool: TODO */;
-	public static final StreamCodec<RegistryFriendlyByteBuf, net.neoforged.neoforge.fluids.SimpleFluidContent> STREAM_CODEC = null /* SteelWool: TODO */;
+	public static final SimpleFluidContent EMPTY = new SimpleFluidContent(FluidStack.EMPTY);
+	public static final Codec<SimpleFluidContent> CODEC = FluidStack.OPTIONAL_CODEC.xmap(SimpleFluidContent::new, content -> content.fluidStack);
+	public static final StreamCodec<RegistryFriendlyByteBuf, SimpleFluidContent> STREAM_CODEC = FluidStack.OPTIONAL_STREAM_CODEC
+			.map(SimpleFluidContent::new, content -> content.fluidStack);
+
 	private final FluidStack fluidStack;
 
 	private SimpleFluidContent(FluidStack fluidStack) {
-		super();
 		this.fluidStack = fluidStack;
 	}
 
-	public static net.neoforged.neoforge.fluids.SimpleFluidContent copyOf(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.copyOf yet");
+	public static SimpleFluidContent copyOf(FluidStack stack) {
+		return stack.isEmpty() ? EMPTY : new SimpleFluidContent(stack.copy());
 	}
 
 	public FluidStack copy() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.copy yet");
+		return fluidStack.copy();
 	}
 
 	public boolean isEmpty() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.isEmpty yet");
+		return fluidStack.isEmpty();
 	}
 
 	public Fluid getFluid() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.getFluid yet");
+		return fluidStack.getFluid();
 	}
 
 	public Holder<Fluid> getFluidHolder() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.getFluidHolder yet");
+		return fluidStack.typeHolder();
 	}
 
-	public boolean is(TagKey<Fluid> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.is yet");
+	public boolean is(TagKey<Fluid> tag) {
+		return fluidStack.is(tag);
 	}
 
-	public boolean is(Fluid arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.is yet");
+	public boolean is(Fluid fluid) {
+		return fluidStack.is(fluid);
 	}
 
-	public boolean is(Predicate<Holder<Fluid>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.is yet");
+	public boolean is(Predicate<Holder<Fluid>> predicate) {
+		return fluidStack.is(predicate);
 	}
 
-	public boolean is(Holder<Fluid> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.is yet");
+	public boolean is(Holder<Fluid> fluid) {
+		return fluidStack.is(fluid);
 	}
 
-	public boolean is(HolderSet<Fluid> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.is yet");
+	public boolean is(HolderSet<Fluid> fluids) {
+		return fluidStack.is(fluids);
 	}
 
 	public int getAmount() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.getAmount yet");
+		return fluidStack.getAmount();
 	}
 
 	public FluidType getFluidType() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.getFluidType yet");
+		return fluidStack.getFluidType();
 	}
 
-	public boolean is(FluidType arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.is yet");
+	public boolean is(FluidType type) {
+		return fluidStack.is(type);
 	}
 
-	public boolean matches(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.matches yet");
+	public boolean matches(FluidStack other) {
+		return FluidStack.matches(fluidStack, other);
 	}
 
-	public boolean isSameFluid(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.isSameFluid yet");
+	public boolean isSameFluid(FluidStack other) {
+		return FluidStack.isSameFluid(fluidStack, other);
 	}
 
-	public boolean isSameFluidSameComponents(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.isSameFluidSameComponents yet");
+	public boolean isSameFluidSameComponents(FluidStack other) {
+		return FluidStack.isSameFluidSameComponents(fluidStack, other);
 	}
 
-	public boolean isSameFluidSameComponents(net.neoforged.neoforge.fluids.SimpleFluidContent arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.isSameFluidSameComponents yet");
+	public boolean isSameFluidSameComponents(SimpleFluidContent other) {
+		return FluidStack.isSameFluidSameComponents(fluidStack, other.fluidStack);
 	}
 
+	@Override
 	public DataComponentMap getComponents() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.getComponents yet");
+		return fluidStack.getComponents();
 	}
 
-	public boolean equals(Object arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.equals yet");
+	@Override
+	public boolean equals(Object other) {
+		return other instanceof SimpleFluidContent content && FluidStack.matches(fluidStack, content.fluidStack);
 	}
 
+	@Override
 	public int hashCode() {
-		throw new UnsupportedOperationException("SteelWool does not implement SimpleFluidContent.hashCode yet");
+		return fluidStack.getAmount() * 31 + FluidStack.hashFluidAndComponents(fluidStack);
 	}
 }

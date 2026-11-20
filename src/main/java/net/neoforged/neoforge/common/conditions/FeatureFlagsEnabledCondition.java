@@ -1,20 +1,22 @@
 package net.neoforged.neoforge.common.conditions;
 
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.flag.FeatureFlags;
 
-/**
- * SteelWool re-implementation of NeoForge's {@code FeatureFlagsEnabledCondition}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
- */
+/** Passes when all of {@code flags} are enabled. */
 public record FeatureFlagsEnabledCondition(FeatureFlagSet flags) implements ICondition {
-	public static final MapCodec<net.neoforged.neoforge.common.conditions.FeatureFlagsEnabledCondition> CODEC = null /* SteelWool: TODO */;
+	public static final MapCodec<FeatureFlagsEnabledCondition> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+			FeatureFlags.CODEC.fieldOf("flags").forGetter(FeatureFlagsEnabledCondition::flags)).apply(instance, FeatureFlagsEnabledCondition::new));
 
-	public boolean test(ICondition.IContext arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FeatureFlagsEnabledCondition.test yet");
+	@Override
+	public boolean test(IContext context) {
+		return flags.isSubsetOf(context.enabledFeatures());
 	}
 
+	@Override
 	public MapCodec<? extends ICondition> codec() {
-		throw new UnsupportedOperationException("SteelWool does not implement FeatureFlagsEnabledCondition.codec yet");
+		return CODEC;
 	}
 }

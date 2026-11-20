@@ -2,179 +2,219 @@ package net.neoforged.neoforge.fluids;
 
 import java.util.Optional;
 import java.util.function.Supplier;
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
+import net.neoforged.neoforge.common.SoundActions;
+import org.jspecify.annotations.Nullable;
 
 /**
- * SteelWool re-implementation of NeoForge's {@code BaseFlowingFluid}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
+ * A simple flowing fluid for mods, configured with {@link Properties}: a source fluid
+ * ({@link Source}) and a flowing one ({@link Flowing}) that spread like water.
  */
 public abstract class BaseFlowingFluid extends FlowingFluid {
 	private final Supplier<? extends FluidType> fluidType;
 	private final Supplier<? extends Fluid> flowing;
 	private final Supplier<? extends Fluid> still;
-	private final Supplier<? extends Item> bucket;
-	private final Supplier<? extends LiquidBlock> block;
+	private final @Nullable Supplier<? extends Item> bucket;
+	private final @Nullable Supplier<? extends LiquidBlock> block;
 	private final int slopeFindDistance;
 	private final int levelDecreasePerBlock;
 	private final float explosionResistance;
 	private final int tickRate;
 
-	protected BaseFlowingFluid(net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties arg0) {
-		super();
-		throw new UnsupportedOperationException("SteelWool does not implement the BaseFlowingFluid constructor yet");
+	protected BaseFlowingFluid(Properties properties) {
+		this.fluidType = properties.fluidType;
+		this.flowing = properties.flowing;
+		this.still = properties.still;
+		this.bucket = properties.bucket;
+		this.block = properties.block;
+		this.slopeFindDistance = properties.slopeFindDistance;
+		this.levelDecreasePerBlock = properties.levelDecreasePerBlock;
+		this.explosionResistance = properties.explosionResistance;
+		this.tickRate = properties.tickRate;
 	}
 
 	public FluidType getFluidType() {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.getFluidType yet");
+		return fluidType.get();
 	}
 
+	@Override
 	public Fluid getFlowing() {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.getFlowing yet");
+		return flowing.get();
 	}
 
+	@Override
 	public Fluid getSource() {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.getSource yet");
+		return still.get();
 	}
 
-	protected boolean canConvertToSource(ServerLevel arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.canConvertToSource yet");
+	/** Vanilla asks this; it follows the fluid type's {@code canConvertToSource} property. */
+	@Override
+	protected boolean canConvertToSource(ServerLevel level) {
+		return getFluidType().canConvertToSource(new FluidStack(getSource(), FluidType.BUCKET_VOLUME));
 	}
 
-	public boolean canConvertToSource(FluidState arg0, ServerLevel arg1, BlockPos arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.canConvertToSource yet");
+	/** Whether two sources next to each other create a new source here, as water does. */
+	public boolean canConvertToSource(FluidState state, ServerLevel level, BlockPos pos) {
+		return getFluidType().canConvertToSource(state, level, pos);
 	}
 
-	protected void beforeDestroyingBlock(LevelAccessor arg0, BlockPos arg1, BlockState arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.beforeDestroyingBlock yet");
+	@Override
+	protected void beforeDestroyingBlock(LevelAccessor level, BlockPos pos, BlockState state) {
+		BlockEntity blockEntity = state.hasBlockEntity() ? level.getBlockEntity(pos) : null;
+		Block.dropResources(state, level, pos, blockEntity);
 	}
 
-	protected int getSlopeFindDistance(LevelReader arg0) {
-		return this.slopeFindDistance;
+	@Override
+	protected int getSlopeFindDistance(LevelReader level) {
+		return slopeFindDistance;
 	}
 
-	protected int getDropOff(LevelReader arg0) {
-		return this.levelDecreasePerBlock;
+	@Override
+	protected int getDropOff(LevelReader level) {
+		return levelDecreasePerBlock;
 	}
 
+	@Override
 	public Item getBucket() {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.getBucket yet");
+		return bucket != null ? bucket.get() : Items.AIR;
 	}
 
-	protected boolean canBeReplacedWith(FluidState arg0, BlockGetter arg1, BlockPos arg2, Fluid arg3, Direction arg4) {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.canBeReplacedWith yet");
+	@Override
+	protected boolean canBeReplacedWith(FluidState state, BlockGetter level, BlockPos pos, Fluid fluid, Direction direction) {
+		// Like water: only replaced from above, and only by a different fluid.
+		return direction == Direction.DOWN && !isSame(fluid);
 	}
 
-	public int getTickDelay(LevelReader arg0) {
-		return this.tickRate;
+	@Override
+	public int getTickDelay(LevelReader level) {
+		return tickRate;
 	}
 
+	@Override
 	protected float getExplosionResistance() {
-		return this.explosionResistance;
+		return explosionResistance;
 	}
 
-	protected BlockState createLegacyBlock(FluidState arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.createLegacyBlock yet");
+	@Override
+	protected BlockState createLegacyBlock(FluidState state) {
+		if (block == null) {
+			return Blocks.AIR.defaultBlockState();
+		}
+		return block.get().defaultBlockState().setValue(LiquidBlock.LEVEL, getLegacyLevel(state));
 	}
 
-	public boolean isSame(Fluid arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.isSame yet");
+	@Override
+	public boolean isSame(Fluid fluid) {
+		return fluid == still.get() || fluid == flowing.get();
 	}
 
+	@Override
 	public Optional<SoundEvent> getPickupSound() {
-		throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.getPickupSound yet");
+		return Optional.ofNullable(getFluidType().getSound(SoundActions.BUCKET_FILL));
 	}
 
-	public static class Flowing extends net.neoforged.neoforge.fluids.BaseFlowingFluid {
-		public Flowing(net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties arg0) {
-			super((net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties) null);
-			throw new UnsupportedOperationException("SteelWool does not implement the BaseFlowingFluid.Flowing constructor yet");
+	public static class Flowing extends BaseFlowingFluid {
+		public Flowing(Properties properties) {
+			super(properties);
+			registerDefaultState(getStateDefinition().any().setValue(LEVEL, 7));
 		}
 
-		protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Flowing.createFluidStateDefinition yet");
+		@Override
+		protected void createFluidStateDefinition(StateDefinition.Builder<Fluid, FluidState> builder) {
+			super.createFluidStateDefinition(builder);
+			builder.add(LEVEL);
 		}
 
-		public int getAmount(FluidState arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Flowing.getAmount yet");
+		@Override
+		public int getAmount(FluidState state) {
+			return state.getValue(LEVEL);
 		}
 
-		public boolean isSource(FluidState arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Flowing.isSource yet");
+		@Override
+		public boolean isSource(FluidState state) {
+			return false;
 		}
 	}
 
+	/** Configures a {@link BaseFlowingFluid}. The defaults match water. */
 	public static class Properties {
-		private Supplier<? extends FluidType> fluidType;
-		private Supplier<? extends Fluid> still;
-		private Supplier<? extends Fluid> flowing;
-		private Supplier<? extends Item> bucket;
-		private Supplier<? extends LiquidBlock> block;
-		private int slopeFindDistance;
-		private int levelDecreasePerBlock;
-		private float explosionResistance;
-		private int tickRate;
+		private final Supplier<? extends FluidType> fluidType;
+		private final Supplier<? extends Fluid> still;
+		private final Supplier<? extends Fluid> flowing;
+		private @Nullable Supplier<? extends Item> bucket;
+		private @Nullable Supplier<? extends LiquidBlock> block;
+		private int slopeFindDistance = 4;
+		private int levelDecreasePerBlock = 1;
+		private float explosionResistance = 1;
+		private int tickRate = 5;
 
 		public Properties(Supplier<? extends FluidType> fluidType, Supplier<? extends Fluid> still, Supplier<? extends Fluid> flowing) {
-			super();
-			this.slopeFindDistance = 4;
-			this.levelDecreasePerBlock = 1;
-			this.explosionResistance = 1f;
-			this.tickRate = 5;
 			this.fluidType = fluidType;
 			this.still = still;
 			this.flowing = flowing;
 		}
 
-		public net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties bucket(Supplier<? extends Item> arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Properties.bucket yet");
+		public Properties bucket(Supplier<? extends Item> bucket) {
+			this.bucket = bucket;
+			return this;
 		}
 
-		public net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties block(Supplier<? extends LiquidBlock> arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Properties.block yet");
+		public Properties block(Supplier<? extends LiquidBlock> block) {
+			this.block = block;
+			return this;
 		}
 
-		public net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties slopeFindDistance(int arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Properties.slopeFindDistance yet");
+		public Properties slopeFindDistance(int slopeFindDistance) {
+			this.slopeFindDistance = slopeFindDistance;
+			return this;
 		}
 
-		public net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties levelDecreasePerBlock(int arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Properties.levelDecreasePerBlock yet");
+		public Properties levelDecreasePerBlock(int levelDecreasePerBlock) {
+			this.levelDecreasePerBlock = levelDecreasePerBlock;
+			return this;
 		}
 
-		public net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties explosionResistance(float arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Properties.explosionResistance yet");
+		public Properties explosionResistance(float explosionResistance) {
+			this.explosionResistance = explosionResistance;
+			return this;
 		}
 
-		public net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties tickRate(int arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Properties.tickRate yet");
+		public Properties tickRate(int tickRate) {
+			this.tickRate = tickRate;
+			return this;
 		}
 	}
 
-	public static class Source extends net.neoforged.neoforge.fluids.BaseFlowingFluid {
-		public Source(net.neoforged.neoforge.fluids.BaseFlowingFluid.Properties arg0) {
-			super(arg0);
+	public static class Source extends BaseFlowingFluid {
+		public Source(Properties properties) {
+			super(properties);
 		}
 
-		public int getAmount(FluidState arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Source.getAmount yet");
+		@Override
+		public int getAmount(FluidState state) {
+			return 8;
 		}
 
-		public boolean isSource(FluidState arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement BaseFlowingFluid.Source.isSource yet");
+		@Override
+		public boolean isSource(FluidState state) {
+			return true;
 		}
 	}
 }

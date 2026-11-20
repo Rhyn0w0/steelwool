@@ -1,72 +1,108 @@
 package net.neoforged.neoforge.common.conditions;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
+import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.MapCodec;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraft.world.flag.FeatureFlags;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 /**
- * SteelWool re-implementation of NeoForge's {@code ICondition}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
+ * A condition on data, such as a recipe that should only load when a mod is present. Conditions are
+ * written in a {@code "neoforge:conditions"} list next to the data; each has a {@code "type"} from
+ * {@link NeoForgeRegistries#CONDITION_SERIALIZERS}.
  */
 public interface ICondition {
-	public static final Codec<net.neoforged.neoforge.common.conditions.ICondition> CODEC = null /* SteelWool: TODO */;
-	public static final Codec<List<net.neoforged.neoforge.common.conditions.ICondition>> LIST_CODEC = null /* SteelWool: TODO */;
+	Codec<ICondition> CODEC = NeoForgeRegistries.CONDITION_SERIALIZERS.byNameCodec().dispatch(ICondition::codec, Function.identity());
+	Codec<List<ICondition>> LIST_CODEC = CODEC.listOf();
 
-	static <V extends Object, T extends Object> Optional<T> getConditionally(Codec<T> arg0, DynamicOps<V> arg1, V arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement ICondition.getConditionally yet");
+	/** Decodes {@code input} with {@code codec} unless its conditions fail, in which case it is empty. */
+	static <V, T> Optional<T> getConditionally(Codec<T> codec, DynamicOps<V> ops, V input) {
+		if (!conditionsMatched(ops, input)) {
+			return Optional.empty();
+		}
+		return Optional.of(codec.parse(ops, input).getOrThrow());
 	}
 
-	static <V extends Object, T extends Object> Optional<T> getWithConditionalCodec(Codec<Optional<T>> arg0, DynamicOps<V> arg1, V arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement ICondition.getWithConditionalCodec yet");
+	static <V, T> Optional<T> getWithConditionalCodec(Codec<Optional<T>> codec, DynamicOps<V> ops, V input) {
+		return codec.parse(ops, input).getOrThrow();
 	}
 
-	static <V extends Object> boolean conditionsMatched(DynamicOps<V> arg0, V arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement ICondition.conditionsMatched yet");
+	/** Whether the {@code "neoforge:conditions"} of {@code input} (if any) all pass. */
+	static <V> boolean conditionsMatched(DynamicOps<V> ops, V input) {
+		return ops.getMap(input).result()
+				.map(map -> map.get(ConditionalOps.DEFAULT_CONDITIONS_KEY))
+				.map(conditions -> {
+					DataResult<List<ICondition>> parsed = LIST_CODEC.parse(ops, conditions);
+					IContext context = ops instanceof ConditionalOps<?> conditional ? conditional.conditionContext() : IContext.EMPTY;
+					return parsed.getOrThrow().stream().allMatch(condition -> condition.test(context));
+				})
+				.orElse(true);
 	}
 
-	static void writeConditions(HolderLookup.Provider arg0, JsonObject arg1, net.neoforged.neoforge.common.conditions.ICondition... arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement ICondition.writeConditions yet");
+	static void writeConditions(HolderLookup.Provider registries, JsonObject json, ICondition... conditions) {
+		writeConditions(registries, json, List.of(conditions));
 	}
 
-	static void writeConditions(HolderLookup.Provider arg0, JsonObject arg1, List<net.neoforged.neoforge.common.conditions.ICondition> arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement ICondition.writeConditions yet");
+	static void writeConditions(HolderLookup.Provider registries, JsonObject json, List<ICondition> conditions) {
+		writeConditions(RegistryOps.create(JsonOps.INSTANCE, registries), json, conditions);
 	}
 
-	static void writeConditions(DynamicOps<JsonElement> arg0, JsonObject arg1, List<net.neoforged.neoforge.common.conditions.ICondition> arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement ICondition.writeConditions yet");
+	static void writeConditions(DynamicOps<JsonElement> ops, JsonObject json, List<ICondition> conditions) {
+		if (!conditions.isEmpty()) {
+			json.add(ConditionalOps.DEFAULT_CONDITIONS_KEY, LIST_CODEC.encodeStart(ops, conditions).getOrThrow());
+		}
 	}
 
-	boolean test(net.neoforged.neoforge.common.conditions.ICondition.IContext arg0);
+	boolean test(IContext context);
 
-	MapCodec<? extends net.neoforged.neoforge.common.conditions.ICondition> codec();
+	MapCodec<? extends ICondition> codec();
 
-	public interface IContext {
-		public static final net.neoforged.neoforge.common.conditions.ICondition.IContext EMPTY = null /* SteelWool: TODO */;
-		public static final net.neoforged.neoforge.common.conditions.ICondition.IContext TAGS_INVALID = null /* SteelWool: TODO */;
+	/** What conditions can look at: loaded tags, registries and enabled features. */
+	interface IContext {
+		IContext EMPTY = new IContext() {
+			@Override
+			public <T> boolean isTagLoaded(TagKey<T> key) {
+				return false;
+			}
+		};
 
-		<T extends Object> boolean isTagLoaded(TagKey<T> arg0);
+		IContext TAGS_INVALID = new IContext() {
+			@Override
+			public <T> boolean isTagLoaded(TagKey<T> key) {
+				throw new UnsupportedOperationException("Tag conditions cannot be used here");
+			}
+		};
 
-		default <T extends Object> Collection<Holder<T>> getTag(TagKey<T> arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement ICondition.IContext.getTag yet");
+		<T> boolean isTagLoaded(TagKey<T> key);
+
+		default <T> Collection<Holder<T>> getTag(TagKey<T> key) {
+			return List.of();
 		}
 
 		default HolderGetter.Provider registries() {
-			throw new UnsupportedOperationException("SteelWool does not implement ICondition.IContext.registries yet");
+			return RegistryAccess.EMPTY;
 		}
 
+		/** The running server's enabled features, or vanilla's when there is no server. */
 		default FeatureFlagSet enabledFeatures() {
-			throw new UnsupportedOperationException("SteelWool does not implement ICondition.IContext.enabledFeatures yet");
+			var server = ServerLifecycleHooks.getCurrentServer();
+			return server != null ? server.getWorldData().enabledFeatures() : FeatureFlags.VANILLA_SET;
 		}
 	}
 }

@@ -1,26 +1,31 @@
 package net.neoforged.neoforge.common.conditions;
 
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 
-/**
- * SteelWool re-implementation of NeoForge's {@code RegisteredCondition}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
- */
-public record RegisteredCondition<T extends Object>(ResourceKey<T> registryKey) implements ICondition {
-	public static final MapCodec<net.neoforged.neoforge.common.conditions.RegisteredCondition<?>> CODEC = null /* SteelWool: TODO */;
+/** Passes when the registry entry exists. The registry defaults to items. */
+public record RegisteredCondition<T>(ResourceKey<T> registryKey) implements ICondition {
+	public static final MapCodec<RegisteredCondition<?>> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+			Identifier.CODEC.optionalFieldOf("registry", Registries.ITEM.identifier()).forGetter(condition -> condition.registryKey().registry()),
+			Identifier.CODEC.fieldOf("value").forGetter(condition -> condition.registryKey().identifier()))
+			.apply(instance, RegisteredCondition::new));
 
-	private RegisteredCondition(Identifier arg0, Identifier arg1) {
-		this((ResourceKey) null);
-		throw new UnsupportedOperationException("SteelWool does not implement the RegisteredCondition constructor yet");
+	private RegisteredCondition(Identifier registry, Identifier value) {
+		this(ResourceKey.create(ResourceKey.createRegistryKey(registry), value));
 	}
 
-	public boolean test(ICondition.IContext arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement RegisteredCondition.test yet");
+	@Override
+	public boolean test(IContext context) {
+		return context.registries().lookup(ResourceKey.<T>createRegistryKey(registryKey.registry()))
+				.flatMap(lookup -> lookup.get(registryKey))
+				.isPresent();
 	}
 
+	@Override
 	public MapCodec<? extends ICondition> codec() {
-		throw new UnsupportedOperationException("SteelWool does not implement RegisteredCondition.codec yet");
+		return CODEC;
 	}
 }

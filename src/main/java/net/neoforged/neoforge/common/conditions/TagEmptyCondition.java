@@ -1,26 +1,30 @@
 package net.neoforged.neoforge.common.conditions;
 
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 
-/**
- * SteelWool re-implementation of NeoForge's {@code TagEmptyCondition}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
- */
-public record TagEmptyCondition<T extends Object>(TagKey<T> tag) implements ICondition {
-	public static final MapCodec<net.neoforged.neoforge.common.conditions.TagEmptyCondition<?>> CODEC = null /* SteelWool: TODO */;
+/** Passes when the tag is empty or not loaded. The registry defaults to items. */
+public record TagEmptyCondition<T>(TagKey<T> tag) implements ICondition {
+	public static final MapCodec<TagEmptyCondition<?>> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+			Identifier.CODEC.optionalFieldOf("registry", Registries.ITEM.identifier()).forGetter(condition -> condition.tag().registry().identifier()),
+			Identifier.CODEC.fieldOf("tag").forGetter(condition -> condition.tag().location()))
+			.apply(instance, TagEmptyCondition::new));
 
-	private TagEmptyCondition(Identifier arg0, Identifier arg1) {
-		this((TagKey) null);
-		throw new UnsupportedOperationException("SteelWool does not implement the TagEmptyCondition constructor yet");
+	private TagEmptyCondition(Identifier registry, Identifier tag) {
+		this(TagKey.create(ResourceKey.createRegistryKey(registry), tag));
 	}
 
-	public boolean test(ICondition.IContext arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement TagEmptyCondition.test yet");
+	@Override
+	public boolean test(IContext context) {
+		return !context.isTagLoaded(tag) || context.getTag(tag).isEmpty();
 	}
 
+	@Override
 	public MapCodec<? extends ICondition> codec() {
-		throw new UnsupportedOperationException("SteelWool does not implement TagEmptyCondition.codec yet");
+		return CODEC;
 	}
 }

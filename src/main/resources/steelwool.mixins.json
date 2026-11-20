@@ -17,12 +17,16 @@
 		"patch.CreativeModeTabMixin",
 		"patch.EntityAttachmentMixin",
 		"patch.EntityMixin",
+		"patch.ItemPropertiesMixin",
 		"patch.ItemStackMixin",
 		"patch.LevelAttachmentMixin",
 		"patch.LevelMixin",
+		"patch.MappedRegistryMixin",
 		"patch.PackMixin",
 		"patch.PrimaryLevelDataMixin",
-		"patch.ReloadableServerResourcesMixin"
+		"patch.ReloadableServerResourcesMixin",
+		"patch.SavedDataStorageMixin",
+		"patch.SavedDataTypeMixin"
 	],
 	"client": [
 		"client.ClientCommonPacketListenerImplMixin"

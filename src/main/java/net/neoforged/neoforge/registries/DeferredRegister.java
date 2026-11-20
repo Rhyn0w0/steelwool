@@ -145,11 +145,9 @@ public class DeferredRegister<T> {
 		return this.customRegistry;
 	}
 
-	/**
-	 * Accepted for compatibility; SteelWool does not support registry aliases yet, so worlds saved with
-	 * the old name lose those entries.
-	 */
+	/** Makes lookups of {@code from}, when nothing is registered under it, find {@code to} instead. */
 	public void addAlias(Identifier from, Identifier to) {
+		dev.steelwool.registry.RegistryAliases.add(this.registryKey, from, to);
 	}
 
 	public Collection<DeferredHolder<T, ? extends T>> getEntries() {

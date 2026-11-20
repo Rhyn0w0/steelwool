@@ -1,19 +1,22 @@
 package net.neoforged.neoforge.common.conditions;
 
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.neoforged.fml.ModList;
 
-/**
- * SteelWool re-implementation of NeoForge's {@code ModLoadedCondition}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
- */
+/** Passes when the mod {@code modid} is loaded (a NeoForge mod, or a Fabric mod). */
 public record ModLoadedCondition(String modid) implements ICondition {
-	public static MapCodec<net.neoforged.neoforge.common.conditions.ModLoadedCondition> CODEC;
+	public static MapCodec<ModLoadedCondition> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+			Codec.STRING.fieldOf("modid").forGetter(ModLoadedCondition::modid)).apply(instance, ModLoadedCondition::new));
 
-	public boolean test(ICondition.IContext arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadedCondition.test yet");
+	@Override
+	public boolean test(IContext context) {
+		return ModList.get().isLoaded(modid);
 	}
 
+	@Override
 	public MapCodec<? extends ICondition> codec() {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadedCondition.codec yet");
+		return CODEC;
 	}
 }

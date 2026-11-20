@@ -1,19 +1,20 @@
 package net.neoforged.neoforge.common.conditions;
 
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-/**
- * SteelWool re-implementation of NeoForge's {@code NotCondition}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
- */
+/** Passes when {@code value} fails. */
 public record NotCondition(ICondition value) implements ICondition {
-	public static final MapCodec<net.neoforged.neoforge.common.conditions.NotCondition> CODEC = null /* SteelWool: TODO */;
+	public static final MapCodec<NotCondition> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+			ICondition.CODEC.fieldOf("value").forGetter(NotCondition::value)).apply(instance, NotCondition::new));
 
-	public boolean test(ICondition.IContext arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement NotCondition.test yet");
+	@Override
+	public boolean test(IContext context) {
+		return !value.test(context);
 	}
 
+	@Override
 	public MapCodec<? extends ICondition> codec() {
-		throw new UnsupportedOperationException("SteelWool does not implement NotCondition.codec yet");
+		return CODEC;
 	}
 }
