@@ -1,0 +1,26 @@
+license="CC0-1.0"
+
+[[mods]]
+modId="steelwool_testmod"
+version="${file.jarVersion}"
+displayName="SteelWool Test Mod"
+description='''
+A NeoForge mod used by SteelWool's automated tests.
+'''
+
+[[mixins]]
+config="steelwool_testmod.mixins.json"
+
+[[dependencies.steelwool_testmod]]
+    modId="neoforge"
+    type="required"
+    versionRange="[26.3,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.steelwool_testmod]]
+    modId="minecraft"
+    type="required"
+    versionRange="[26.3,26.4)"
+    ordering="NONE"
+    side="BOTH"

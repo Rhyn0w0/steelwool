@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "dev.steelwool.mixin",
+	"plugin": "dev.steelwool.mixin.SteelWoolMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"BuiltInPackSourceMixin",
+		"patch.CreativeModeTabBuilderMixin",
+		"patch.CreativeModeTabMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

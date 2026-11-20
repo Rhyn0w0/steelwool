@@ -1,0 +1,29 @@
+// A NeoForge mod used by SteelWool's game tests. Built with NeoForge's official ModDevGradle
+// plugin (like the NeoForge MDK), so its bytecode matches what real NeoForge mods contain.
+plugins {
+	id 'java-library'
+	id 'net.neoforged.moddev' version '2.0.148'
+}
+
+version = mod_version
+group = 'dev.steelwool.testmod'
+
+base {
+	archivesName = 'steelwool_testmod'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+neoForge {
+	version = project.neo_version
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+
+jar {
+	manifest {
+		attributes('Implementation-Version': project.version)
+	}
+}

@@ -1,0 +1,146 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	maven {
+		name = 'NeoForged'
+		url = 'https://maven.neoforged.net/releases/'
+	}
+}
+
+// Sets up a `gametest` source set plus two tasks that boot the game with SteelWool and the test
+// NeoForge mod, run the game tests and exit:
+//   runGameTest       - dedicated server (also run by `check` / `build`)
+//   runClientGameTest - client; opens a game window, so it is run by hand
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = 'steelwool-gametest'
+		enableGameTests = true
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// NeoForge's event bus is a standalone library, so SteelWool ships the real thing.
+	implementation "net.neoforged:bus:${project.neoforge_bus_version}"
+	include "net.neoforged:bus:${project.neoforge_bus_version}"
+	implementation "net.jodah:typetools:${project.typetools_version}"
+	include "net.jodah:typetools:${project.typetools_version}"
+	// Dist / @OnlyIn markers used throughout NeoForge mods.
+	implementation "net.neoforged:mergetool:${project.mergetool_version}:api"
+	include "net.neoforged:mergetool:${project.mergetool_version}:api"
+	// TOML parser for META-INF/neoforge.mods.toml (the same library NeoForge uses).
+	implementation "com.electronwill.night-config:core:${project.night_config_version}"
+	include "com.electronwill.night-config:core:${project.night_config_version}"
+	implementation "com.electronwill.night-config:toml:${project.night_config_version}"
+	include "com.electronwill.night-config:toml:${project.night_config_version}"
+
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// The test NeoForge mod lives in its own Gradle build (testmod/) that uses NeoForge's official
+// ModDevGradle plugin, so it is compiled exactly like a real NeoForge mod: against NeoForge's
+// patched Minecraft. The game test runs load NeoForge mods from testmod/build/libs instead of
+// mods/neoforge/.
+def testmodJar = gradle.includedBuild('testmod').task(':jar')
+def testmodLibs = file('testmod/build/libs').absolutePath
+
+loom {
+	runs {
+		configureEach {
+			if (name == 'gameTest' || name == 'clientGameTest') {
+				property 'steelwool.neoforgeModsDir', testmodLibs
+			}
+		}
+	}
+}
+
+tasks.matching { it.name == 'runGameTest' || it.name == 'runClientGameTest' }.configureEach {
+	dependsOn testmodJar
+}
+
+// ---- Test bundle: everything needed to try SteelWool in a normal Minecraft install ----
+
+configurations {
+	testBundleMods { transitive = false }
+	testBundleInstaller { transitive = false }
+}
+
+dependencies {
+	testBundleMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	testBundleInstaller "net.fabricmc:fabric-installer:${project.fabric_installer_version}"
+}
+
+// ./gradlew testBundle -> build/distributions/steelwool-test-bundle-<version>.zip
+tasks.register('testBundle', Zip) {
+	group = 'distribution'
+	description = 'Zips SteelWool, Fabric API, the Fabric installer, the test NeoForge mod and testing instructions.'
+	archiveFileName = "steelwool-test-bundle-${project.version}.zip"
+	destinationDirectory = layout.buildDirectory.dir('distributions')
+	def root = "steelwool-test-bundle-${project.version}"
+
+	from('testing/INSTRUCTIONS.md') { into root }
+	from(configurations.testBundleInstaller) { into root }
+	from(tasks.named('jar')) { into "${root}/mods" }
+	from(configurations.testBundleMods) { into "${root}/mods" }
+	from(testmodLibs) {
+		include 'steelwool_testmod-*.jar'
+		into "${root}/mods/neoforge"
+	}
+	dependsOn testmodJar
+}
+
+processResources {
+	def version = project.version
+	inputs.property 'version', version
+
+	filesMatching('fabric.mod.json') {
+		expand 'version': version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+	withSourcesJar()
+}
+
+test {
+	useJUnitPlatform()
+
+	// Minecraft's logging config writes logs/ into the working directory; keep it out of the repo.
+	def testRunDir = layout.buildDirectory.dir('test-run')
+	workingDir = testRunDir
+	doFirst { testRunDir.get().asFile.mkdirs() }
+}
+
+jar {
+	def projectName = project.name
+	inputs.property 'projectName', projectName
+
+	from('LICENSE') {
+		rename { "${it}_${projectName}" }
+	}
+}

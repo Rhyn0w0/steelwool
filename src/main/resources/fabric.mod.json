@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "steelwool",
+	"version": "${version}",
+	"name": "SteelWool",
+	"description": "A translation layer that loads NeoForge mods from mods/neoforge/ on Fabric.",
+	"authors": [],
+	"contact": {},
+	"environment": "*",
+	"entrypoints": {
+		"preLaunch": [
+			"dev.steelwool.SteelWoolPreLaunch"
+		],
+		"main": [
+			"dev.steelwool.SteelWool"
+		],
+		"client": [
+			"dev.steelwool.client.SteelWoolClient"
+		],
+		"server": [
+			"dev.steelwool.server.SteelWoolServer"
+		]
+	},
+	"mixins": [
+		"steelwool.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

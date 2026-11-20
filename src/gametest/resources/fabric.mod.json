@@ -1,0 +1,20 @@
+{
+	"schemaVersion": 1,
+	"id": "steelwool-gametest",
+	"version": "1.0.0",
+	"name": "SteelWool Game Tests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"dev.steelwool.gametest.SteelWoolGameTests"
+		],
+		"fabric-client-gametest": [
+			"dev.steelwool.gametest.SteelWoolClientGameTest"
+		]
+	},
+	"depends": {
+		"steelwool": "*",
+		"fabric-gametest-api-v1": "*",
+		"fabric-client-gametest-api-v1": "*"
+	}
+}

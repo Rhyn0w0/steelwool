@@ -1,0 +1,37 @@
+# Builds SteelWool and runs its tests (unit tests + dedicated-server game tests) on every push and PR.
+name: build
+on: [pull_request, push]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Build and test
+        run: ./gradlew build testBundle
+      - name: Upload mod jar
+        uses: actions/upload-artifact@v7
+        with:
+          name: steelwool
+          path: build/libs/
+      - name: Upload test bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: steelwool-test-bundle
+          path: build/distributions/
+      - name: Upload game test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gametest-logs
+          path: build/run/gameTest/logs/
