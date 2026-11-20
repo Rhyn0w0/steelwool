@@ -25,11 +25,15 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.impl.FabricLoaderImpl;
 import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweakerReader;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.Event;
 import net.neoforged.fml.DeferredWorkQueue;
@@ -50,6 +54,7 @@ import net.neoforged.fml.loading.moddiscovery.ModFile;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import net.neoforged.neoforgespi.language.IModInfo;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
 import org.jspecify.annotations.Nullable;
@@ -311,6 +316,7 @@ public final class SteelWoolLoader {
 		dispatchLifecycle("construct", FMLConstructModEvent::new);
 		SteelWoolConfigs.loadAll();
 		fireRegisterEvents();
+		fireEntityAttributeCreation();
 		dispatchLifecycle("common setup", FMLCommonSetupEvent::new);
 		postToAllModBuses(new RegisterPayloadHandlersEvent());
 
@@ -348,6 +354,13 @@ public final class SteelWoolLoader {
 				post(container, event);
 			}
 		}
+	}
+
+	/** Collects mods' default entity attributes and registers them with Fabric. */
+	private void fireEntityAttributeCreation() {
+		Map<EntityType<? extends LivingEntity>, AttributeSupplier> attributes = new java.util.LinkedHashMap<>();
+		postToAllModBuses(new EntityAttributeCreationEvent(attributes));
+		attributes.forEach(FabricDefaultAttributeRegistry::register);
 	}
 
 	/**

@@ -18,6 +18,8 @@ public final class TestModState {
 	public static volatile boolean serverStartedFiredViaSubscriber;
 	public static volatile boolean mixinApplied;
 	public static volatile boolean payloadsRegistered;
+	public static volatile boolean serverTickFired;
+	public static volatile boolean levelLoadFired;
 	public static volatile int magicNumberAtCommonSetup = -1;
 
 	private TestModState() {

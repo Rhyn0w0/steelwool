@@ -25,7 +25,9 @@ import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -71,6 +73,8 @@ public class TestMod {
 		CREATIVE_MODE_TABS.register(modEventBus);
 
 		NeoForge.EVENT_BUS.register(this);
+		NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, event -> TestModState.serverTickFired = true);
+		NeoForge.EVENT_BUS.addListener(LevelEvent.Load.class, event -> TestModState.levelLoadFired = true);
 		modEventBus.addListener(this::addCreative);
 		modEventBus.addListener(TestPayload::register);
 		modContainer.registerConfig(ModConfig.Type.LOCAL, TestModConfig.SPEC);

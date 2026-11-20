@@ -89,6 +89,14 @@ public class SteelWoolGameTests {
 		helper.succeed();
 	}
 
+	/** Game events posted from Fabric callbacks and SteelWool's mixins reach the mod's listeners. */
+	@GameTest
+	public void gameEventsFire(GameTestHelper helper) {
+		assertFlag(helper, "serverTickFired");
+		assertFlag(helper, "levelLoadFired");
+		helper.succeed();
+	}
+
 	@GameTest
 	public void deferredRegisterEntriesAreRegistered(GameTestHelper helper) {
 		helper.assertTrue(BuiltInRegistries.BLOCK.containsKey(id("test_block")), Component.literal("test_block is not registered"));

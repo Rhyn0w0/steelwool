@@ -28,9 +28,9 @@ Fabric only scans the top level of `mods/`, so it never sees the jars in `mods/n
 Verified:
 
 - NeoForge's official example mod (the [26.3 MDK](https://github.com/NeoForgeMDKs/MDK-26.3-ModDevGradle)), built unmodified with NeoForge's own tooling, loads and runs on a Fabric dedicated server. This covers its block, item, creative tab, config file, common setup and server-starting event.
-- The project's test mod ([`testmod/`](testmod/)) passes 13 automated in-game tests on a dedicated server: registration, lifecycle events, `@EventBusSubscriber`, config, data packs, commands, mod file metadata, payload registration and a mixin from the NeoForge mod.
+- The project's test mod ([`testmod/`](testmod/)) passes 14 automated in-game tests on a dedicated server: registration, lifecycle events, game events, `@EventBusSubscriber`, config, data packs, commands, mod file metadata, payload registration and a mixin from the NeoForge mod.
 - The built `steelwool-0.1.0.jar` works in a real (non-development) Fabric server install.
-- 6 of 35 popular NeoForge mods from Modrinth start on a dedicated server: Cloth Config, Vein Miner, No Chat Reports, Kotlin for Forge, FerriteCore and GeckoLib. See [Compatibility with real mods](#compatibility-with-real-mods).
+- 9 of 35 popular NeoForge mods from Modrinth start on a dedicated server: Cloth Config, Vein Miner, No Chat Reports, Kotlin for Forge, FerriteCore, GeckoLib, AppleSkin, JEI and Clumps. "Start" means the server finishes starting with the mod loaded; it does not mean every feature of the mod works. See [Compatibility with real mods](#compatibility-with-real-mods).
 
 Not yet verified: the client. SteelWool loads NeoForge mods and their resource packs on the client, but the automated client test (`runClientGameTest`) could not render a window in the environment where it was developed.
 
@@ -73,13 +73,25 @@ Each NeoForge mod jar is also added as an always-enabled built-in pack. Its `dat
 | `RegisterPayloadHandlersEvent` | Fabric `main`, after common setup |
 | `RegisterClientPayloadHandlersEvent` | Fabric `client`, before client setup |
 | `BuildCreativeModeTabContentsEvent` | Fabric `CreativeModeTabEvents.MODIFY_OUTPUT_ALL` |
+| `EntityAttributeCreationEvent` | Fabric `main`, after registration (results go to `FabricDefaultAttributeRegistry`) |
+
+Game events on `NeoForge.EVENT_BUS` ([`GameplayEventBridge`](src/main/java/dev/steelwool/bridge/GameplayEventBridge.java) and the tick mixins):
+
+| NeoForge | Fired from |
+|---|---|
+| `ServerTickEvent`, `LevelTickEvent` (server), `PlayerTickEvent`, `EntityTickEvent` (`Pre`/`Post`) | Mixins around `MinecraftServer.tickServer`, `ServerLevel.tick`, `Player.tick`, `ServerLevel.tickNonPassenger` |
+| `PlayerLoggedInEvent` / `PlayerLoggedOutEvent`, `PlayerRespawnEvent`, `Clone`, `PlayerChangedDimensionEvent`, `StartTracking` / `StopTracking` | Fabric connection, player and entity tracking events |
+| `LevelEvent.Load` / `Unload`, `ChunkEvent.Load` / `Unload`, `EntityJoinLevelEvent` / `EntityLeaveLevelEvent` | Fabric server level, chunk and entity events (canceling `EntityJoinLevelEvent` has no effect) |
+| `BreakBlockEvent`, `LivingDeathEvent` | Fabric `PlayerBlockBreakEvents.BEFORE`, `ServerLivingEntityEvents.ALLOW_DEATH` (canceling works) |
+| `PlayerInteractEvent.RightClickBlock` / `LeftClickBlock` / `RightClickItem` / `EntityInteract`, `AttackEntityEvent` | Fabric interaction callbacks (canceling works; `useBlock`/`useItem` are ignored) |
+| `OnDatapackSyncEvent` | Fabric `SYNC_DATA_PACK_CONTENTS` (once per player) |
 
 ## What is supported
 
 | Area | Supported | Not yet |
 |---|---|---|
 | Mod loading | `neoforge.mods.toml` (mods, dependencies, mixins), `@Mod` (incl. `dist`), `@EventBusSubscriber`, jar-in-jar, library jars, access transformers (widening only), `javafml` and `kotlinforforge` mods, `ModList` (incl. mod files and annotation scan data), `LoadingModList`, `FMLLoader`, `IModInfo`/`IModFileInfo`/`IModFile`, `ModLoadingContext`, `FMLEnvironment`, `FMLPaths`, `FMLConfig` (defaults only), `InterModComms`, `LogicalSide`/`EffectiveSide`, `ObfuscationReflectionHelper` | Dependency version range checks, mod ordering, other language providers, coremods, access transformers that narrow access or target classes loaded before `preLaunch` |
-| Events | NeoForge's real event bus (`IEventBus`, `@SubscribeEvent`, priorities, cancellation), the lifecycle and game events in the table above | All other NeoForge game events (player, entity, level, tick, render, input, …) |
+| Events | NeoForge's real event bus (`IEventBus`, `@SubscribeEvent`, priorities, cancellation), the lifecycle and game events in the tables above. About 90 more NeoForge event classes exist with NeoForge's API so mods that subscribe to them load, but SteelWool does not fire them yet. | Firing the other game events (damage, drops, spawning, containers, …), client events (render, input, GUI, …) |
 | Registries | `DeferredRegister` (+ `.Items`, `.Blocks`, `.DataComponents`, `.Entities`), `DeferredHolder`/`DeferredItem`/`DeferredBlock`, `RegisterEvent` | Custom registries (`makeRegistry`, `NewRegistryEvent`), aliases, data maps, datapack registries |
 | Config | `ModConfigSpec` (booleans, numbers with ranges, strings, enums, lists, comments, sections), TOML files in `config/` | Per-world `SYNCED` configs and syncing them to clients, the in-game config screen (a placeholder screen points to the file) |
 | Resources | Mod `assets/` and `data/` as built-in packs | Pack overlays and `pack.mcmeta` features |
@@ -158,6 +170,8 @@ compat/                          popular NeoForge mods to check against (mods.js
 ```
 
 ### Adding support for a NeoForge API
+
+[`tools/genapi.py`](tools/genapi.py) generates a starting point: `python3 tools/genapi.py <neoforge-universal.jar> <out-dir> <class> ...` writes Java source with NeoForge's exact class, constructor, method and field signatures for each class and its nested classes. It turns trivial members (constructors that assign parameters, getters, setters, super calls) into code and makes every other member throw `UnsupportedOperationException("SteelWool does not implement ... yet")`. Copy the files into `src/main/java`, then implement the members that matter. Most of the NeoForge event classes were made this way.
 
 1. Find what a mod needs. SteelWool's error names the missing `net.neoforged` class or method. NeoForge's sources are at `https://maven.neoforged.net/releases/net/neoforged/neoforge/<version>/neoforge-<version>-sources.jar`.
 2. Add the class under `src/main/java/net/neoforged/...` with **exactly** NeoForge's package, name and method signatures. Mods are linked against them by descriptor, so a different return type breaks them. Implement it on top of Fabric API where possible.
