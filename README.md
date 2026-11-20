@@ -30,6 +30,7 @@ Verified:
 - NeoForge's official example mod (the [26.3 MDK](https://github.com/NeoForgeMDKs/MDK-26.3-ModDevGradle)), built unmodified with NeoForge's own tooling, loads and runs on a Fabric dedicated server. This covers its block, item, creative tab, config file, common setup and server-starting event.
 - The project's test mod ([`testmod/`](testmod/)) passes 11 automated in-game tests on a dedicated server: registration, lifecycle events, `@EventBusSubscriber`, config, data packs, commands and a mixin from the NeoForge mod.
 - The built `steelwool-0.1.0.jar` works in a real (non-development) Fabric server install.
+- 3 of 35 popular NeoForge mods from Modrinth start on a dedicated server: Cloth Config, Vein Miner and No Chat Reports. See [Compatibility with real mods](#compatibility-with-real-mods).
 
 Not yet verified: the client. SteelWool loads NeoForge mods and their resource packs on the client, but the automated client test (`runClientGameTest`) could not render a window in the environment where it was developed.
 
@@ -114,6 +115,18 @@ The log lists what SteelWool found (`Found N NeoForge mod(s) in …`) and why it
 
 The first `runGameTest` or `build` also builds the test mod. This runs NeoForge's ModDevGradle setup, which decompiles and patches Minecraft and takes a few minutes. Later runs are cached.
 
+### Compatibility with real mods
+
+[`compat/mods.json`](compat/mods.json) lists about 35 popular NeoForge 26.3 mods from Modrinth. [`compat/compat_check.py`](compat/compat_check.py) does the following for each one:
+
+1. Downloads the mod and its required dependencies.
+2. Starts a fresh Fabric dedicated server with SteelWool and only that mod in `mods/neoforge/`.
+3. Records whether the server finishes starting. If it doesn't, it records why: a missing NeoForge API, a failed mixin, a missing dependency or a crash.
+
+To run it, use `./gradlew testBundle && python3 compat/compat_check.py [slug ...]`. It needs Python 3.10+ and Java 25. The results go to `build/compat/report.md`, with one log per mod.
+
+The [compat workflow](.github/workflows/compat.yml) runs on pushes to `main`, every Monday and on demand. The report appears in the run summary. The workflow fails only if a mod marked `"expect": "pass"` stops loading. When the report shows a new mod passing, set its `expect` to `pass`. The "Missing NeoForge APIs" table at the end of the report is the to-do list for SteelWool.
+
 ### Releasing
 
 1. Set `mod_version` in `gradle.properties` (for example `0.2.0`) and merge to `main`.
@@ -136,6 +149,7 @@ src/main/java/net/neoforged/     SteelWool's re-implementation of the NeoForge /
 src/test/                        JUnit tests
 src/gametest/                    in-game tests (Fabric game test API)
 testmod/                         a NeoForge mod built with NeoForge's own tooling (separate Gradle build)
+compat/                          popular NeoForge mods to check against (mods.json + compat_check.py)
 ```
 
 ### Adding support for a NeoForge API
