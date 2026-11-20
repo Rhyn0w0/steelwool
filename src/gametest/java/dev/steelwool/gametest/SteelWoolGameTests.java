@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -20,6 +21,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.fml.loading.LoadingModList;
+import net.neoforged.neoforge.capabilities.BlockCapability;
+import net.neoforged.neoforge.common.extensions.ILevelExtension;
 import net.neoforged.neoforge.server.permission.PermissionAPI;
 import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.neoforged.neoforgespi.language.IModFileInfo;
@@ -106,6 +109,31 @@ public class SteelWoolGameTests {
 		PermissionNode<Integer> node = (PermissionNode<Integer>) testModField("TestMod", "TEST_PERMISSION");
 		helper.assertTrue(PermissionAPI.getRegisteredNodes().contains(node), Component.literal("Permission node is not registered"));
 		helper.assertTrue(PermissionAPI.getOfflinePermission(java.util.UUID.randomUUID(), node) == 42, Component.literal("Permission did not resolve to 42"));
+		helper.succeed();
+	}
+
+	@GameTest
+	public void customRegistryIsCreated(GameTestHelper helper) {
+		Registry<?> registry = BuiltInRegistries.REGISTRY.getValue(id("greetings"));
+		helper.assertTrue(registry != null, Component.literal("The greetings registry was not added to the root registry"));
+		helper.assertTrue("Hello from a custom registry".equals(registry.getValue(id("hello"))), Component.literal("The greetings registry has no hello entry"));
+		helper.assertTrue(BuiltInRegistries.REGISTRY.getValue(Identifier.fromNamespaceAndPath("neoforge", "attachment_types")) != null,
+				Component.literal("NeoForge's own registries were not added"));
+		helper.succeed();
+	}
+
+	@GameTest
+	public void blockCapabilityIsFound(GameTestHelper helper) {
+		@SuppressWarnings("unchecked")
+		BlockCapability<String, Void> capability = (BlockCapability<String, Void>) testModField("TestMod", "GREETING_CAPABILITY");
+		BlockPos pos = new BlockPos(1, 1, 1);
+		BlockPos absolute = helper.absolutePos(pos);
+		ILevelExtension level = (ILevelExtension) helper.getLevel();
+
+		helper.assertTrue(level.getCapability(capability, absolute) == null, Component.literal("Air should not have the capability"));
+		helper.setBlock(pos, BuiltInRegistries.BLOCK.getValue(id("test_block")));
+		helper.assertTrue(("Hello from " + absolute.toShortString()).equals(level.getCapability(capability, absolute)),
+				Component.literal("The test block does not provide the capability"));
 		helper.succeed();
 	}
 

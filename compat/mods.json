@@ -6,7 +6,7 @@
     { "slug": "cloth-config", "expect": "pass" },
     { "slug": "ferrite-core", "expect": "pass" },
     { "slug": "lithium", "expect": "unknown" },
-    { "slug": "yacl", "expect": "unknown" },
+    { "slug": "yacl", "expect": "pass" },
     { "slug": "architectury-api", "expect": "unknown" },
     { "slug": "veinminer", "expect": "pass" },
     { "slug": "appleskin", "expect": "pass" },
@@ -14,8 +14,8 @@
     { "slug": "geckolib", "expect": "pass" },
     { "slug": "simple-voice-chat", "expect": "pass" },
     { "slug": "jade", "expect": "unknown" },
-    { "slug": "forge-config-api-port", "expect": "unknown" },
-    { "slug": "collective", "expect": "unknown" },
+    { "slug": "forge-config-api-port", "expect": "pass" },
+    { "slug": "collective", "expect": "pass" },
     { "slug": "puzzles-lib", "expect": "unknown" },
     { "slug": "balm", "expect": "unknown" },
     { "slug": "no-chat-reports", "expect": "pass" },
@@ -36,7 +36,7 @@
     { "slug": "chunky", "expect": "pass" },
     { "slug": "journeymap", "expect": "unknown" },
     { "slug": "gravestone-mod", "expect": "unknown" },
-    { "slug": "fallingtree", "expect": "unknown" },
+    { "slug": "fallingtree", "expect": "pass" },
     { "slug": "ae2", "expect": "unknown" }
   ]
 }

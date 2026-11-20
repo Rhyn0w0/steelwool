@@ -55,7 +55,9 @@ import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import net.neoforged.neoforgespi.language.IModInfo;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.registries.NewRegistryEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -315,15 +317,53 @@ public final class SteelWoolLoader {
 
 		dispatchLifecycle("construct", FMLConstructModEvent::new);
 		SteelWoolConfigs.loadAll();
+		fireNewRegistryEvent();
 		fireRegisterEvents();
 		fireEntityAttributeCreation();
 		dispatchLifecycle("common setup", FMLCommonSetupEvent::new);
 		postToAllModBuses(new RegisterPayloadHandlersEvent());
+		postToAllModBuses(construct(RegisterCapabilitiesEvent.class));
 
 		if (!containers.isEmpty()) {
 			LOGGER.info("Constructed and registered {} NeoForge mod(s)", containers.size());
 		}
 	}
+
+	/**
+	 * Adds NeoForge's own registries, then lets mods add theirs. Both go into the root registry before
+	 * registration, so {@code RegisterEvent} fires for them too.
+	 */
+	private void fireNewRegistryEvent() {
+		callHidden(NewRegistryEvent.class, null, "registerNeoForgeRegistries");
+		NewRegistryEvent event = construct(NewRegistryEvent.class);
+		postToAllModBuses(event);
+		callHidden(NewRegistryEvent.class, event, "fill");
+	}
+
+	/** Calls a package-private no-argument method of a NeoForge API class (NeoForge calls it from its own package). */
+	private static void callHidden(Class<?> owner, @Nullable Object target, String name) {
+		try {
+			var method = owner.getDeclaredMethod(name);
+			method.setAccessible(true);
+			method.invoke(target);
+		} catch (java.lang.reflect.InvocationTargetException e) {
+			throw e.getCause() instanceof RuntimeException runtime ? runtime : new IllegalStateException(e.getCause());
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	/** Creates an event whose NeoForge constructor is package-private (NeoForge fires it from its own package). */
+	private static <T> T construct(Class<T> type) {
+		try {
+			var constructor = type.getDeclaredConstructor();
+			constructor.setAccessible(true);
+			return constructor.newInstance();
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
 
 	/** Same rule as FML: explicit {@code modid}, else the {@code @Mod} of the same class, else the jar's first mod. */
 	private static String subscriberModId(NeoForgeModFile file, AnnotationScanResult.SubscriberClass subscriber) {

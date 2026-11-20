@@ -3,9 +3,12 @@ package dev.steelwool.testmod;
 import com.mojang.brigadier.Command;
 import com.mojang.logging.LogUtils;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -22,6 +25,8 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
+import net.neoforged.neoforge.capabilities.BlockCapability;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -35,6 +40,8 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NewRegistryEvent;
+import net.neoforged.neoforge.registries.RegistryBuilder;
 import org.slf4j.Logger;
 
 /**
@@ -65,6 +72,15 @@ public class TestMod {
 	public static final PermissionNode<Integer> TEST_PERMISSION = new PermissionNode<>(MODID, "test_permission", PermissionTypes.INTEGER,
 			(player, uuid, contexts) -> 42);
 
+	/** A custom registry of strings, added in {@link NewRegistryEvent}, with one entry. */
+	public static final ResourceKey<Registry<String>> GREETINGS_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(MODID, "greetings"));
+	public static final Registry<String> GREETINGS = new RegistryBuilder<>(GREETINGS_KEY).create();
+	public static final DeferredRegister<String> GREETING_ENTRIES = DeferredRegister.create(GREETINGS_KEY, MODID);
+	public static final DeferredHolder<String, String> HELLO = GREETING_ENTRIES.register("hello", () -> "Hello from a custom registry");
+
+	/** A block capability that the test block provides. */
+	public static final BlockCapability<String, Void> GREETING_CAPABILITY = BlockCapability.createVoid(Identifier.fromNamespaceAndPath(MODID, "greeting"), String.class);
+
 	public TestMod(IEventBus modEventBus, ModContainer modContainer) {
 		modEventBus.addListener(this::commonSetup);
 		modEventBus.addListener(FMLConstructModEvent.class, event -> TestModState.constructEventFired = true);
@@ -77,6 +93,10 @@ public class TestMod {
 		BLOCKS.register(modEventBus);
 		ITEMS.register(modEventBus);
 		CREATIVE_MODE_TABS.register(modEventBus);
+		GREETING_ENTRIES.register(modEventBus);
+		modEventBus.addListener(NewRegistryEvent.class, event -> event.register(GREETINGS));
+		modEventBus.addListener(RegisterCapabilitiesEvent.class, event ->
+				event.registerBlock(GREETING_CAPABILITY, (level, pos, state, blockEntity, context) -> "Hello from " + pos.toShortString(), TEST_BLOCK.get()));
 
 		NeoForge.EVENT_BUS.register(this);
 		NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, event -> TestModState.serverTickFired = true);

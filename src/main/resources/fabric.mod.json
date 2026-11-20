@@ -21,6 +21,7 @@
 			"dev.steelwool.server.SteelWoolServer"
 		]
 	},
+	"accessWidener": "steelwool.accesswidener",
 	"mixins": [
 		"steelwool.mixins.json"
 	],

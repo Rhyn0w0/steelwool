@@ -145,7 +145,12 @@ public final class AccessTransformers {
 						lines.add("accessible method " + target);
 					}
 
-					if (entry.removeFinal() && !method[0].equals("<init>")) {
+					// An access widener makes a private method it opens up final, but an access transformer
+					// leaves it overridable, and NeoForge code overrides such methods.
+					int access = Integer.parseInt(method[2]);
+					boolean opensPrivate = widen && (access & (Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC)) == Opcodes.ACC_PRIVATE;
+
+					if ((entry.removeFinal() || opensPrivate) && !method[0].equals("<init>")) {
 						lines.add("extendable method " + target);
 					}
 				}
@@ -168,7 +173,7 @@ public final class AccessTransformers {
 
 				@Override
 				public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-					members.methods.add(new String[] {name, descriptor});
+					members.methods.add(new String[] {name, descriptor, String.valueOf(access)});
 					return null;
 				}
 			}, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);

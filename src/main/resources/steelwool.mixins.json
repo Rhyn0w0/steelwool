@@ -10,7 +10,11 @@
 		"ServerLevelTickMixin",
 		"ServerCommonPacketListenerImplMixin",
 		"patch.CreativeModeTabBuilderMixin",
-		"patch.CreativeModeTabMixin"
+		"patch.CreativeModeTabMixin",
+		"patch.EntityMixin",
+		"patch.ItemStackMixin",
+		"patch.LevelMixin",
+		"patch.PrimaryLevelDataMixin"
 	],
 	"client": [
 		"client.ClientCommonPacketListenerImplMixin"

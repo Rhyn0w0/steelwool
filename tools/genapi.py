@@ -83,9 +83,12 @@ def parse_class(block):
             elif s.startswith(("LineNumberTable", "LocalVariableTable", "StackMapTable", "Exception table", "RuntimeVisible", "Signature", "MethodParameters", "RuntimeInvisible")):
                 in_code = False
     inner = []
-    m = re.search(r"InnerClasses:\n((?:\s+.*\n)+?)(?:\S|\Z)", block + "\nX")
-    if m:
-        inner = m.group(1).split("\n")
+    lines = block.split("\n")
+    if "InnerClasses:" in lines:
+        for l in lines[lines.index("InnerClasses:") + 1:]:
+            if not l[:1].isspace():
+                break
+            inner.append(l)
     return header, flags_line, members, inner
 
 
@@ -173,7 +176,7 @@ def desc_defaults(desc):
         elif t in PRIMS.values():
             out.append(f"({t}) 0")
         else:
-            out.append(f"({t}) null")
+            out.append("null" if t == "java.lang.Object" else f"({t}) null")
     return out
 
 
@@ -295,7 +298,7 @@ def render_class(jar, fqcn, all_texts, indent, nested=False):
         h = re.sub(r"^((?:public |protected |private )?)", r"\1static ", h, count=1)
     if is_enum:
         h = re.sub(r"\s*extends java\.lang\.Enum<[^>]*>", "", h).replace("final enum", "enum").replace("final class", "enum").replace(" class ", " enum ")
-        h = re.sub(r"^((?:public |protected |private )?)(?:static )?(?:final )?(?:class|enum)", r"\1enum", h)
+        h = re.sub(r"^((?:public |protected |private )?)(?:abstract )?(?:static )?(?:final )?(?:abstract )?(?:class|enum)", r"\1enum", h)
         if nested:
             h = h.replace("static ", "")
     if is_interface:
@@ -305,7 +308,7 @@ def render_class(jar, fqcn, all_texts, indent, nested=False):
         for mm in members:
             dd = mm.decl.rstrip(";")
             if "(" not in dd and " static " not in f" {dd} " and not dd.startswith("static {}"):
-                comps.append(src_type(" ".join(dd.split()[-2:])))
+                comps.append(src_type(re.sub(r"^(?:(?:private|protected|public|final|transient|volatile) )+", "", dd)))
         h = re.sub(r"\s*extends java\.lang\.Record", "", h)
         h = re.sub(r"(?:final )?class " + re.escape(short) + r"(<[^{]*?>)?", lambda mm: "record " + short + (mm.group(1) or "") + "(" + ", ".join(comps) + ")", h, count=1)
         h = h.replace("static final record", "static record").replace("final record", "record")
@@ -353,7 +356,7 @@ def render_class(jar, fqcn, all_texts, indent, nested=False):
                     v = '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
                 elif kind == "long":
                     v += "L"
-                elif kind == "float":
+                elif kind == "float" and not v.endswith("f"):
                     v += "f"
                 elif t == "boolean":
                     v = "true" if v == "1" else "false"
