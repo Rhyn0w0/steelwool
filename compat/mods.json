@@ -4,7 +4,7 @@
   "comment": "Popular NeoForge mods that compat/compat_check.py boots one at a time on a Fabric dedicated server with SteelWool. 'slug' is the Modrinth project. 'version' (optional) pins a Modrinth version id or version number; otherwise the newest NeoForge 26.3 version is used. 'with' (optional) lists extra Modrinth slugs to install alongside, for dependencies the Modrinth page doesn't declare. Set 'expect' to 'pass' once a mod works: the check then fails if it stops working.",
   "mods": [
     { "slug": "cloth-config", "expect": "pass" },
-    { "slug": "ferrite-core", "expect": "unknown" },
+    { "slug": "ferrite-core", "expect": "pass" },
     { "slug": "lithium", "expect": "unknown" },
     { "slug": "yacl", "expect": "unknown" },
     { "slug": "architectury-api", "expect": "unknown" },
@@ -19,7 +19,7 @@
     { "slug": "puzzles-lib", "expect": "unknown" },
     { "slug": "balm", "expect": "unknown" },
     { "slug": "no-chat-reports", "expect": "pass" },
-    { "slug": "kotlin-for-forge", "expect": "unknown" },
+    { "slug": "kotlin-for-forge", "expect": "pass" },
     { "slug": "bookshelf-lib", "expect": "unknown" },
     { "slug": "terrablender", "expect": "unknown" },
     { "slug": "clumps", "expect": "unknown" },

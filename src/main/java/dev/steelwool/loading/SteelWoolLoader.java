@@ -2,6 +2,9 @@ package dev.steelwool.loading;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,11 +16,14 @@ import java.util.Set;
 import java.util.function.BiFunction;
 
 import dev.steelwool.config.SteelWoolConfigs;
+import dev.steelwool.discovery.AccessTransformers;
 import dev.steelwool.discovery.AnnotationScanResult;
 import dev.steelwool.discovery.NeoForgeModDiscovery;
 import dev.steelwool.discovery.NeoForgeModFile;
 import dev.steelwool.discovery.NeoForgeModMetadata;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.impl.FabricLoaderImpl;
+import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweakerReader;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -39,8 +45,13 @@ import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
 import net.neoforged.fml.event.lifecycle.InterModProcessEvent;
 import net.neoforged.fml.javafmlmod.FMLModContainer;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.fml.loading.LoadingModList;
+import net.neoforged.fml.loading.moddiscovery.ModFile;
+import net.neoforged.fml.loading.moddiscovery.ModInfo;
+import net.neoforged.neoforgespi.language.IModInfo;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.registries.RegisterEvent;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixins;
@@ -66,6 +77,7 @@ public final class SteelWoolLoader {
 
 	private List<NeoForgeModFile> modFiles = List.of();
 	private final List<FMLModContainer> containers = new ArrayList<>();
+	private final Map<String, ModInfo> modInfos = new HashMap<>();
 	private boolean attached;
 
 	private SteelWoolLoader() {
@@ -102,6 +114,8 @@ public final class SteelWoolLoader {
 
 		try {
 			Files.createDirectories(dir);
+			// Mixin config plugins of NeoForge mods may write their own config files before the game creates config/.
+			Files.createDirectories(FabricLoader.getInstance().getConfigDir());
 			result = new NeoForgeModDiscovery(FabricLoader.getInstance().getGameDir().resolve(".steelwool").resolve("jarjar")).discover(dir);
 		} catch (IOException e) {
 			throw new UncheckedIOException("SteelWool could not read NeoForge mods from " + dir, e);
@@ -110,6 +124,8 @@ public final class SteelWoolLoader {
 		result.skipped().forEach((path, reason) -> LOGGER.warn("Ignoring {} in {}: {}", path.getFileName(), dir, reason));
 		modFiles = List.copyOf(result.mods());
 		validate(modFiles);
+		publishLoadingModList();
+		result.libraries().forEach(lib -> FabricLauncherBase.getLauncher().addToClassPath(lib));
 
 		for (NeoForgeModFile file : modFiles) {
 			FabricLauncherBase.getLauncher().addToClassPath(file.path());
@@ -119,10 +135,7 @@ public final class SteelWoolLoader {
 				Mixins.addConfiguration(mixinConfig);
 			}
 
-			if (!file.modsToml().accessTransformers().isEmpty()) {
-				LOGGER.warn("{} declares access transformers {}; SteelWool does not apply access transformers yet",
-						file.fileName(), file.modsToml().accessTransformers());
-			}
+			applyAccessTransformers(file);
 		}
 
 		if (modFiles.isEmpty()) {
@@ -130,6 +143,80 @@ public final class SteelWoolLoader {
 		} else {
 			LOGGER.info("Found {} NeoForge mod(s) in {}: {}", modIdCount(), dir,
 					modFiles.stream().flatMap(f -> f.modsToml().mods().stream()).map(m -> m.modId() + " " + m.version()).toList());
+		}
+	}
+
+	/** FML's default when {@code neoforge.mods.toml} lists no access transformers. */
+	private static final String DEFAULT_ACCESS_TRANSFORMER = "META-INF/accesstransformer.cfg";
+
+	/**
+	 * Applies a mod's access transformers by translating them to Fabric access widener entries, which
+	 * Fabric applies to classes as they load. Classes already loaded at this point are not changed.
+	 */
+	private static void applyAccessTransformers(NeoForgeModFile file) {
+		List<String> declared = file.modsToml().accessTransformers();
+
+		try (FileSystem fs = FileSystems.newFileSystem(file.path())) {
+			List<String> paths = declared.isEmpty() && Files.exists(fs.getPath(DEFAULT_ACCESS_TRANSFORMER)) ? List.of(DEFAULT_ACCESS_TRANSFORMER) : declared;
+			List<AccessTransformers.Entry> entries = new ArrayList<>();
+
+			for (String atPath : paths) {
+				Path at = fs.getPath(atPath);
+
+				if (!Files.exists(at)) {
+					LOGGER.warn("{} declares access transformer {}, which is not in the jar", file.fileName(), atPath);
+					continue;
+				}
+
+				try (var reader = Files.newBufferedReader(at)) {
+					entries.addAll(AccessTransformers.parse(reader));
+				}
+			}
+
+			if (entries.isEmpty()) {
+				return;
+			}
+
+			List<String> problems = new ArrayList<>();
+			List<String> lines = AccessTransformers.toAccessWidener(entries, SteelWoolLoader::classBytes, problems);
+			problems.forEach(p -> LOGGER.debug("{}: skipping access transformer entry: {}", file.fileName(), p));
+
+			String namespace = FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace();
+			String widener = "accessWidener v2 " + namespace + "\n" + String.join("\n", lines) + "\n";
+			ClassTweakerReader.create(FabricLoaderImpl.INSTANCE.getClassTweaker()).read(widener.getBytes(StandardCharsets.UTF_8), namespace);
+			LOGGER.debug("Applied {} access transformer entries from {}", lines.size(), file.fileName());
+		} catch (IOException | RuntimeException e) {
+			throw ModLoadingFailure.of(file.modsToml().mods().getFirst().modId(), "its access transformers could not be applied", e);
+		}
+	}
+
+	private static byte @Nullable [] classBytes(String internalName) {
+		try {
+			return FabricLauncherBase.getLauncher().getClassByteArray(internalName.replace('/', '.'), false);
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	/** Makes the discovered mods visible through FML's {@code LoadingModList} / {@code ModList} file APIs. */
+	private void publishLoadingModList() {
+		Map<Path, ModFile> byPath = new HashMap<>();
+		List<ModFile> files = new ArrayList<>();
+
+		for (NeoForgeModFile file : modFiles) {
+			ModFile parent = file.parent() == null ? null : byPath.get(file.parent());
+			ModFile modFile = new ModFile(file, parent);
+			byPath.put(file.path(), modFile);
+			files.add(modFile);
+		}
+
+		LoadingModList.steelwool$set(files);
+		modInfos.clear();
+
+		for (ModFile file : files) {
+			for (IModInfo info : file.getModInfos()) {
+				modInfos.put(info.getModId(), (ModInfo) info);
+			}
 		}
 	}
 
@@ -207,7 +294,7 @@ public final class SteelWoolLoader {
 						.filter(s -> mod.modId().equals(subscriberModId(file, s)))
 						.toList();
 
-				FMLModContainer container = new FMLModContainer(new SteelWoolModInfo(mod, file), entrypoints, subscribers, classLoader, dist);
+				FMLModContainer container = new FMLModContainer(modInfos.get(mod.modId()), entrypoints, subscribers, classLoader, dist);
 				containers.add(container);
 				ModList.get().steelwool$add(container);
 			}

@@ -23,6 +23,7 @@ import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.event.IModBusEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforgespi.language.IModInfo;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,6 +94,15 @@ public class FMLModContainer extends ModContainer {
 			Class<?> modClass = Class.forName(className, true, classLoader);
 			Constructor<?>[] constructors = modClass.getConstructors();
 
+			if (constructors.length == 0) {
+				Object kotlinObject = kotlinObjectInstance(modClass);
+
+				if (kotlinObject != null) {
+					// A Kotlin for Forge `object` mod: loading the class ran its init block.
+					return kotlinObject;
+				}
+			}
+
 			if (constructors.length != 1) {
 				throw new IllegalStateException("Mod class " + className + " must have exactly 1 public constructor, found " + constructors.length);
 			}
@@ -130,6 +140,21 @@ public class FMLModContainer extends ModContainer {
 		} catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
 			throw ModLoadingFailure.of(modId, "its mod class " + className + " could not be constructed", e);
 		}
+	}
+
+	private static @Nullable Object kotlinObjectInstance(Class<?> modClass) throws IllegalAccessException {
+		try {
+			java.lang.reflect.Field field = modClass.getDeclaredField("INSTANCE");
+			int modifiers = field.getModifiers();
+
+			if (Modifier.isStatic(modifiers) && Modifier.isPublic(modifiers) && field.getType() == modClass) {
+				return field.get(null);
+			}
+		} catch (NoSuchFieldException e) {
+			// not a Kotlin object
+		}
+
+		return null;
 	}
 
 	private void registerSubscriber(AnnotationScanResult.SubscriberClass subscriber) {

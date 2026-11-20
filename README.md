@@ -28,9 +28,9 @@ Fabric only scans the top level of `mods/`, so it never sees the jars in `mods/n
 Verified:
 
 - NeoForge's official example mod (the [26.3 MDK](https://github.com/NeoForgeMDKs/MDK-26.3-ModDevGradle)), built unmodified with NeoForge's own tooling, loads and runs on a Fabric dedicated server. This covers its block, item, creative tab, config file, common setup and server-starting event.
-- The project's test mod ([`testmod/`](testmod/)) passes 11 automated in-game tests on a dedicated server: registration, lifecycle events, `@EventBusSubscriber`, config, data packs, commands and a mixin from the NeoForge mod.
+- The project's test mod ([`testmod/`](testmod/)) passes 12 automated in-game tests on a dedicated server: registration, lifecycle events, `@EventBusSubscriber`, config, data packs, commands, mod file metadata and a mixin from the NeoForge mod.
 - The built `steelwool-0.1.0.jar` works in a real (non-development) Fabric server install.
-- 3 of 35 popular NeoForge mods from Modrinth start on a dedicated server: Cloth Config, Vein Miner and No Chat Reports. See [Compatibility with real mods](#compatibility-with-real-mods).
+- 5 of 35 popular NeoForge mods from Modrinth start on a dedicated server: Cloth Config, Vein Miner, No Chat Reports, Kotlin for Forge and FerriteCore. See [Compatibility with real mods](#compatibility-with-real-mods).
 
 Not yet verified: the client. SteelWool loads NeoForge mods and their resource packs on the client, but the automated client test (`runClientGameTest`) could not render a window in the environment where it was developed.
 
@@ -43,10 +43,10 @@ Minecraft 26.x ships unobfuscated, so NeoForge mods and Fabric run against the s
 1. **Loads the jars.** Fabric's `preLaunch` entrypoint ([`SteelWoolLoader.discoverAndAttach`](src/main/java/dev/steelwool/loading/SteelWoolLoader.java)) reads each jar in `mods/neoforge/`:
    - It parses `META-INF/neoforge.mods.toml`.
    - It finds `@Mod` and `@EventBusSubscriber` classes by reading the bytecode, without loading the classes.
-   - It extracts any jars bundled inside (jar-in-jar).
+   - It extracts any jars bundled inside (jar-in-jar). Jars without a `neoforge.mods.toml` that are libraries (`FMLModType: LIBRARY` / `GAMELIBRARY`) or only bundle other jars, like Kotlin for Forge, go on the class path too.
    - It checks required and incompatible dependencies against both NeoForge and Fabric mods.
 
-   It then adds the jars to the game class path and registers their mixin configs with Fabric's Mixin.
+   It then adds the jars to the game class path and registers their mixin configs with Fabric's Mixin. It translates each mod's access transformers (`META-INF/accesstransformer.cfg`) into Fabric access widener entries, which Fabric applies as classes load.
 2. **Re-implements the NeoForge API.** The classes NeoForge mods call (`net.neoforged.*`) are written fresh in SteelWool, with the same names and signatures:
    - The mod loading lifecycle runs on top of Fabric's entrypoints.
    - Registration (`DeferredRegister`, `RegisterEvent`) runs inside Fabric's normal registration window.
@@ -76,7 +76,7 @@ Each NeoForge mod jar is also added as an always-enabled built-in pack. Its `dat
 
 | Area | Supported | Not yet |
 |---|---|---|
-| Mod loading | `neoforge.mods.toml` (mods, dependencies, mixins), `@Mod` (incl. `dist`), `@EventBusSubscriber`, jar-in-jar, `ModList`, `ModLoadingContext`, `FMLEnvironment`, `FMLPaths` | Access transformers (logged and skipped), `IModInfo.getVersion()`, dependency version ranges, mod ordering, language providers other than `javafml`, coremods |
+| Mod loading | `neoforge.mods.toml` (mods, dependencies, mixins), `@Mod` (incl. `dist`), `@EventBusSubscriber`, jar-in-jar, library jars, access transformers (widening only), `javafml` and `kotlinforforge` mods, `ModList` (incl. mod files and annotation scan data), `LoadingModList`, `FMLLoader`, `IModInfo`/`IModFileInfo`/`IModFile`, `ModLoadingContext`, `FMLEnvironment`, `FMLPaths`, `FMLConfig` (defaults only), `InterModComms`, `LogicalSide`/`EffectiveSide`, `ObfuscationReflectionHelper` | Dependency version range checks, mod ordering, other language providers, coremods, access transformers that narrow access or target classes loaded before `preLaunch` |
 | Events | NeoForge's real event bus (`IEventBus`, `@SubscribeEvent`, priorities, cancellation), the lifecycle and game events in the table above | All other NeoForge game events (player, entity, level, tick, render, input, …) |
 | Registries | `DeferredRegister` (+ `.Items`, `.Blocks`, `.DataComponents`, `.Entities`), `DeferredHolder`/`DeferredItem`/`DeferredBlock`, `RegisterEvent` | Custom registries (`makeRegistry`, `NewRegistryEvent`), aliases, data maps, datapack registries |
 | Config | `ModConfigSpec` (booleans, numbers with ranges, strings, enums, lists, comments, sections), TOML files in `config/` | Per-world `SYNCED` configs and syncing them to clients, the in-game config screen (a placeholder screen points to the file) |
@@ -126,6 +126,8 @@ The first `runGameTest` or `build` also builds the test mod. This runs NeoForge'
 To run it, use `./gradlew testBundle && python3 compat/compat_check.py [slug ...]`. It needs Python 3.10+ and Java 25. The results go to `build/compat/report.md`, with one log per mod. To test the checker itself, run `python3 -m unittest discover compat`.
 
 The [compat workflow](.github/workflows/compat.yml) runs on pull requests, on pushes to `main`, every Monday and on demand. The report appears in the run summary. The workflow fails only if a mod marked `"expect": "pass"` stops loading. When the report shows a new mod passing, set its `expect` to `pass`. The "Missing NeoForge APIs" table at the end of the report is the to-do list for SteelWool.
+
+The report only shows the first missing class each mod hits. To see everything a mod uses that SteelWool lacks, run `python3 compat/missing_api.py [--members] build/libs/steelwool-<version>.jar <mod.jar> ...` (the compat check saves the jars under `build/compat/downloads/`). It reads the mod's bytecode and lists each missing `net.neoforged` class and member, with the mods that use it.
 
 ### Releasing
 

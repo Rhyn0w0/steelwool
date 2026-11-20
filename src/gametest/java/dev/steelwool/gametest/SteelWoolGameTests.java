@@ -15,7 +15,13 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.fml.loading.LoadingModList;
+import net.neoforged.neoforgespi.language.IModFileInfo;
+import net.neoforged.neoforgespi.language.IModInfo;
+import org.objectweb.asm.Type;
 
 /**
  * Checks that SteelWool loaded the NeoForge test mod ({@code testmod/}) and that each supported
@@ -48,6 +54,28 @@ public class SteelWoolGameTests {
 	public void modIsListed(GameTestHelper helper) {
 		helper.assertTrue(ModList.get().isLoaded(MODID), Component.literal("ModList does not contain " + MODID));
 		helper.assertTrue(ModList.get().getModContainerById(MODID).isPresent(), Component.literal("No ModContainer for " + MODID));
+		helper.succeed();
+	}
+
+	/** FML's file-level APIs, which mods use to read their metadata and find annotated plugin classes. */
+	@GameTest
+	public void modFileMetadataIsAvailable(GameTestHelper helper) {
+		IModFileInfo file = ModList.get().getModFileById(MODID);
+		helper.assertTrue(file != null, Component.literal("ModList.getModFileById returned null"));
+		helper.assertTrue(file == LoadingModList.get().getModFileById(MODID), Component.literal("LoadingModList disagrees with ModList"));
+		helper.assertTrue(FMLLoader.getCurrent().getLoadingModList() == LoadingModList.get(), Component.literal("FMLLoader has a different LoadingModList"));
+
+		IModInfo info = file.getMods().getFirst();
+		helper.assertTrue(info.getModId().equals(MODID), Component.literal("Wrong mod id " + info.getModId()));
+		helper.assertTrue(info.getOwningFile() == file, Component.literal("IModInfo.getOwningFile is not the mod file"));
+		helper.assertTrue(info.getVersion() != null, Component.literal("No version"));
+		helper.assertTrue(file.getFile().getFilePath().toString().endsWith(".jar"), Component.literal("Unexpected file path " + file.getFile().getFilePath()));
+
+		Type modAnnotation = Type.getType(Mod.class);
+		boolean foundMod = ModList.get().getAllScanData().stream()
+				.flatMap(data -> data.getAnnotations().stream())
+				.anyMatch(a -> a.annotationType().equals(modAnnotation) && MODID.equals(a.annotationData().get("value")));
+		helper.assertTrue(foundMod, Component.literal("Scan data has no @Mod(\"" + MODID + "\") annotation"));
 		helper.succeed();
 	}
 

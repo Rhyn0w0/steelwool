@@ -115,14 +115,54 @@ class NeoForgeModDiscoveryTest {
 	}
 
 	@Test
-	void skipsNonJavafmlLoaders() throws IOException {
+	void skipsUnsupportedLoaders() throws IOException {
+		Path mods = Files.createDirectory(temp.resolve("neoforge"));
+		byte[] toml = "modLoader=\"lowcodefml\"\n[[mods]]\nmodId=\"low\"\n".getBytes(StandardCharsets.UTF_8);
+		write(mods.resolve("low.jar"), jar(Map.of("META-INF/neoforge.mods.toml", toml), null));
+
+		var result = new NeoForgeModDiscovery(temp.resolve("cache")).discover(mods);
+
+		assertEquals(List.of(), result.mods());
+		assertTrue(result.skipped().get(mods.resolve("low.jar")).contains("lowcodefml"));
+	}
+
+	@Test
+	void loadsKotlinForForgeMods() throws IOException {
 		Path mods = Files.createDirectory(temp.resolve("neoforge"));
 		byte[] toml = "modLoader=\"kotlinforforge\"\n[[mods]]\nmodId=\"kt\"\n".getBytes(StandardCharsets.UTF_8);
 		write(mods.resolve("kt.jar"), jar(Map.of("META-INF/neoforge.mods.toml", toml), null));
 
 		var result = new NeoForgeModDiscovery(temp.resolve("cache")).discover(mods);
 
-		assertEquals(List.of(), result.mods());
-		assertTrue(result.skipped().get(mods.resolve("kt.jar")).contains("kotlinforforge"));
+		assertEquals(List.of("kt"), result.mods().stream().map(f -> f.modsToml().mods().getFirst().modId()).toList());
+	}
+
+	@Test
+	void loadsLibraryJarsAndTheModsTheyBundle() throws IOException {
+		Path mods = Files.createDirectory(temp.resolve("neoforge"));
+		byte[] nestedMod = jar(Map.of("META-INF/neoforge.mods.toml", modsToml("bundled")), "1.0");
+		byte[] nestedLib = jar(Map.of("com/lib/Lib.class", new byte[0]), null);
+		Map<String, byte[]> entries = new LinkedHashMap<>();
+		entries.put("META-INF/jarjar/bundled.jar", nestedMod);
+		entries.put("META-INF/jarjar/lib.jar", nestedLib);
+		write(mods.resolve("container.jar"), jar(entries, null));
+
+		Manifest manifest = new Manifest();
+		manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+		manifest.getMainAttributes().putValue("FMLModType", "GAMELIBRARY");
+		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+
+		try (JarOutputStream out = new JarOutputStream(bytes, manifest)) {
+			out.putNextEntry(new JarEntry("com/gamelib/Api.class"));
+			out.closeEntry();
+		}
+
+		write(mods.resolve("gamelib.jar"), bytes.toByteArray());
+
+		var result = new NeoForgeModDiscovery(temp.resolve("cache")).discover(mods);
+
+		assertEquals(List.of("bundled"), result.mods().stream().map(f -> f.modsToml().mods().getFirst().modId()).toList());
+		assertEquals(List.of("container.jar", "lib.jar", "gamelib.jar"), result.libraries().stream().map(p -> p.getFileName().toString()).toList());
+		assertEquals(Map.of(), result.skipped());
 	}
 }
