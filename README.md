@@ -114,6 +114,13 @@ The log lists what SteelWool found (`Found N NeoForge mod(s) in …`) and why it
 
 The first `runGameTest` or `build` also builds the test mod. This runs NeoForge's ModDevGradle setup, which decompiles and patches Minecraft and takes a few minutes. Later runs are cached.
 
+### Releasing
+
+1. Set `mod_version` in `gradle.properties` (for example `0.2.0`) and merge to `main`.
+2. Tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
+
+The [release workflow](.github/workflows/release.yml) builds and tests the mod. It then publishes a GitHub release with `steelwool-<version>.jar` and `steelwool-test-bundle-<version>.zip` attached. It fails if the tag doesn't match `mod_version`, and marks `0.x` versions as pre-releases.
+
 ### Project layout
 
 ```
