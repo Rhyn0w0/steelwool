@@ -72,6 +72,7 @@ public class TestMod {
 
 		NeoForge.EVENT_BUS.register(this);
 		modEventBus.addListener(this::addCreative);
+		modEventBus.addListener(TestPayload::register);
 		modContainer.registerConfig(ModConfig.Type.LOCAL, TestModConfig.SPEC);
 
 		TestModState.constructed = true;

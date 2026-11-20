@@ -5,8 +5,12 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"BuiltInPackSourceMixin",
+		"ServerCommonPacketListenerImplMixin",
 		"patch.CreativeModeTabBuilderMixin",
 		"patch.CreativeModeTabMixin"
+	],
+	"client": [
+		"client.ClientCommonPacketListenerImplMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

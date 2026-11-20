@@ -11,7 +11,7 @@
     { "slug": "veinminer", "expect": "pass" },
     { "slug": "appleskin", "expect": "unknown" },
     { "slug": "jei", "expect": "unknown" },
-    { "slug": "geckolib", "expect": "unknown" },
+    { "slug": "geckolib", "expect": "pass" },
     { "slug": "simple-voice-chat", "expect": "unknown" },
     { "slug": "jade", "expect": "unknown" },
     { "slug": "forge-config-api-port", "expect": "unknown" },

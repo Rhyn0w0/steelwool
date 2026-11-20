@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
@@ -22,13 +23,19 @@ public final class GameEventBridge {
 	}
 
 	public static void register() {
-		ServerLifecycleEvents.SERVER_STARTING.register(server -> NeoForge.EVENT_BUS.post(new ServerAboutToStartEvent(server)));
+		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+			ServerLifecycleHooks.steelwool$setCurrentServer(server);
+			NeoForge.EVENT_BUS.post(new ServerAboutToStartEvent(server));
+		});
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			NeoForge.EVENT_BUS.post(new ServerStartingEvent(server));
 			NeoForge.EVENT_BUS.post(new ServerStartedEvent(server));
 		});
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> NeoForge.EVENT_BUS.post(new ServerStoppingEvent(server)));
-		ServerLifecycleEvents.SERVER_STOPPED.register(server -> NeoForge.EVENT_BUS.post(new ServerStoppedEvent(server)));
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+			NeoForge.EVENT_BUS.post(new ServerStoppedEvent(server));
+			ServerLifecycleHooks.steelwool$setCurrentServer(null);
+		});
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, context, selection) ->
 				NeoForge.EVENT_BUS.post(new RegisterCommandsEvent(dispatcher, selection, context)));

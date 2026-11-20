@@ -50,6 +50,7 @@ import net.neoforged.fml.loading.moddiscovery.ModFile;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
 import net.neoforged.neoforgespi.language.IModInfo;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -311,6 +312,7 @@ public final class SteelWoolLoader {
 		SteelWoolConfigs.loadAll();
 		fireRegisterEvents();
 		dispatchLifecycle("common setup", FMLCommonSetupEvent::new);
+		postToAllModBuses(new RegisterPayloadHandlersEvent());
 
 		if (!containers.isEmpty()) {
 			LOGGER.info("Constructed and registered {} NeoForge mod(s)", containers.size());

@@ -5,6 +5,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -76,6 +77,15 @@ public class SteelWoolGameTests {
 				.flatMap(data -> data.getAnnotations().stream())
 				.anyMatch(a -> a.annotationType().equals(modAnnotation) && MODID.equals(a.annotationData().get("value")));
 		helper.assertTrue(foundMod, Component.literal("Scan data has no @Mod(\"" + MODID + "\") annotation"));
+		helper.succeed();
+	}
+
+	/** RegisterPayloadHandlersEvent reached the mod and its payload is registered with Fabric's networking API. */
+	@GameTest
+	public void payloadIsRegisteredWithFabric(GameTestHelper helper) {
+		assertFlag(helper, "payloadsRegistered");
+		helper.assertTrue(ServerPlayNetworking.getGlobalReceivers().contains(id("test_payload")),
+				Component.literal("No Fabric server receiver for steelwool_testmod:test_payload"));
 		helper.succeed();
 	}
 
