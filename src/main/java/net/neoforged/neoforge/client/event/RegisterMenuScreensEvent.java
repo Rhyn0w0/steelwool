@@ -23,6 +23,6 @@ public class RegisterMenuScreensEvent extends Event implements IModBusEvent {
 	}
 
 	public <M extends AbstractContainerMenu, U extends Screen & MenuAccess<M>> void register(MenuType<? extends M> arg0, MenuScreens.ScreenConstructor<M, U> arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement the RegisterMenuScreensEvent constructor yet");
+		throw new UnsupportedOperationException("SteelWool does not implement RegisterMenuScreensEvent.register yet");
 	}
 }

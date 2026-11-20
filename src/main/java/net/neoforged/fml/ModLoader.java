@@ -21,8 +21,8 @@ import org.apache.logging.log4j.Logger;
  * Members that throw {@link UnsupportedOperationException} are not implemented yet.
  */
 public final class ModLoader {
-	private static final Logger LOGGER = null /* SteelWool: TODO */;
-	private static final List<ModLoadingIssue> loadingIssues = null /* SteelWool: TODO */;
+	private static final Logger LOGGER = org.apache.logging.log4j.LogManager.getLogger();
+	private static final List<ModLoadingIssue> loadingIssues = new java.util.concurrent.CopyOnWriteArrayList<>();
 	private static ModList modList;
 
 	private ModLoader() {
@@ -82,47 +82,60 @@ public final class ModLoader {
 	}
 
 	public static <T extends Event & IModBusEvent> void runEventGenerator(Function<ModContainer, T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.buildModContainerFromTOML yet");
+		for (ModContainer container : ModList.get().getSortedMods()) {
+			container.acceptEvent(arg0.apply(container));
+		}
 	}
 
 	public static <T extends Event & IModBusEvent> void postEvent(T arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.buildModContainerFromTOML yet");
+		for (ModContainer container : ModList.get().getSortedMods()) {
+			container.acceptEvent(arg0);
+		}
 	}
 
 	public static <T extends Event & IModBusEvent> T postEventWithReturn(T arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.buildModContainerFromTOML yet");
+		postEvent(arg0);
+		return arg0;
 	}
 
 	public static <T extends Event & IModBusEvent> void postEventWrapContainerInModOrder(T arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.buildModContainerFromTOML yet");
+		postEventWithWrapInModOrder(arg0, (container, event) -> {}, (container, event) -> {});
 	}
 
 	public static <T extends Event & IModBusEvent> void postEventWithWrapInModOrder(T arg0, BiConsumer<ModContainer, T> arg1, BiConsumer<ModContainer, T> arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.buildModContainerFromTOML yet");
+		// Each priority phase in turn, and within a phase the mods in order; pre and post run around each mod.
+		for (net.neoforged.bus.api.EventPriority phase : net.neoforged.bus.api.EventPriority.values()) {
+			for (ModContainer container : ModList.get().getSortedMods()) {
+				arg1.accept(container, arg0);
+				container.acceptEvent(phase, arg0);
+				arg2.accept(container, arg0);
+			}
+		}
 	}
 
 	public static boolean hasErrors() {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.hasErrors yet");
+		return loadingIssues.stream().anyMatch(issue -> issue.severity() == ModLoadingIssue.Severity.ERROR);
 	}
 
 	public static List<ModLoadingIssue> getLoadingErrors() {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.getLoadingErrors yet");
+		return loadingIssues.stream().filter(issue -> issue.severity() == ModLoadingIssue.Severity.ERROR).toList();
 	}
 
 	public static List<ModLoadingIssue> getLoadingWarnings() {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.getLoadingWarnings yet");
+		return loadingIssues.stream().filter(issue -> issue.severity() == ModLoadingIssue.Severity.WARNING).toList();
 	}
 
 	public static List<ModLoadingIssue> getLoadingIssues() {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.getLoadingIssues yet");
+		return List.copyOf(loadingIssues);
 	}
 
 	public static void clearLoadingIssues() {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.clearLoadingIssues yet");
+		loadingIssues.clear();
 	}
 
 	public static void addLoadingIssue(ModLoadingIssue arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoader.addLoadingIssue yet");
+		loadingIssues.add(arg0);
+		LOGGER.warn("Mod loading issue: {} {}", arg0.translationKey(), arg0.translationArgs(), arg0.cause());
 	}
 
 	public static void clear() {

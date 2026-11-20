@@ -92,6 +92,13 @@ def parse_class(block):
     return header, flags_line, members, inner
 
 
+def erase(type_name):
+    """A Java type without its type arguments: Map<K, V> -> Map."""
+    while "<" in type_name:
+        type_name = re.sub(r"<[^<>]*>", "", type_name)
+    return type_name.strip()
+
+
 def load_index(ins):
     op, arg = ins
     m = re.match(r"^[ailfd]load(?:_(\d)|$)", op)
@@ -343,6 +350,9 @@ def render_class(jar, fqcn, all_texts, indent, nested=False):
     field_names = []
     field_types = {}
     record_fields = [src_type(mm.decl.rstrip(";")).split()[-1] for mm in members if is_record and "(" not in mm.decl and "ACC_STATIC" not in mm.flags]
+    # Erased component types, to tell the canonical constructor from others with as many parameters.
+    record_types = [erase(src_type(re.sub(r"^(?:(?:private|protected|public|final) )+", "", mm.decl.rstrip(";")).rsplit(" ", 1)[0]))
+                    for mm in members if is_record and "(" not in mm.decl and "ACC_STATIC" not in mm.flags]
     for f in fields:
         d = src_type(f.decl.rstrip(";"))
         field_names.append(d.split()[-1])
@@ -383,7 +393,7 @@ def render_class(jar, fqcn, all_texts, indent, nested=False):
         params = [src_type(p) for p in param_types(d)]
         abstract = "ACC_ABSTRACT" in m.flags
         simple = name_part.split(".")[-1]
-        if is_record and ((m.is_ctor and len(params) == len(record_fields)) or (simple in record_fields and not params) or simple in ("toString", "hashCode", "equals")):
+        if is_record and ((m.is_ctor and [erase(x) for x in params] == record_types) or (simple in record_fields and not params) or simple in ("toString", "hashCode", "equals")):
             continue
         if is_enum and m.is_ctor and [c[0] for c in m.code] == ["aload_0", "aload_1", "iload_2", "invokespecial", "return"]:
             continue

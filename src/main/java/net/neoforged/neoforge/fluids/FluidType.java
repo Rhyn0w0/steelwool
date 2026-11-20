@@ -32,7 +32,7 @@ import net.neoforged.neoforge.common.util.Lazy;
  */
 public class FluidType {
 	public static final int BUCKET_VOLUME = 1000;
-	public static final Lazy<Integer> SIZE = null /* SteelWool: TODO */;
+	public static final Lazy<Integer> SIZE = Lazy.of(() -> net.neoforged.neoforge.registries.NeoForgeRegistries.FLUID_TYPES.keySet().size());
 	private String descriptionId;
 	private final double motionScale;
 	private final boolean canPushEntity;
@@ -55,16 +55,37 @@ public class FluidType {
 	protected final Map<SoundAction, SoundEvent> sounds;
 
 	public FluidType(net.neoforged.neoforge.fluids.FluidType.Properties arg0) {
-		super();
-		throw new UnsupportedOperationException("SteelWool does not implement the FluidType constructor yet");
+		this.descriptionId = arg0.descriptionId;
+		this.motionScale = arg0.motionScale;
+		this.canPushEntity = arg0.canPushEntity;
+		this.canSwim = arg0.canSwim;
+		this.canDrown = arg0.canDrown;
+		this.fallDistanceModifier = arg0.fallDistanceModifier;
+		this.canExtinguish = arg0.canExtinguish;
+		this.canConvertToSource = arg0.canConvertToSource;
+		this.supportsBoating = arg0.supportsBoating;
+		this.pathType = arg0.pathType;
+		this.adjacentPathType = arg0.adjacentPathType;
+		this.canHydrate = arg0.canHydrate;
+		this.lightLevel = arg0.lightLevel;
+		this.density = arg0.density;
+		this.temperature = arg0.temperature;
+		this.viscosity = arg0.viscosity;
+		this.rarity = arg0.rarity;
+		this.dripInfo = arg0.dripInfo;
+		this.isWaterLike = arg0.isWaterLike;
+		this.sounds = Map.copyOf(arg0.sounds);
 	}
 
 	public Component getDescription() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getDescription yet");
+		return Component.translatable(getDescriptionId());
 	}
 
 	public String getDescriptionId() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getDescriptionId yet");
+		if (descriptionId == null) {
+			descriptionId = net.minecraft.util.Util.makeDescriptionId("fluid_type", net.neoforged.neoforge.registries.NeoForgeRegistries.FLUID_TYPES.getKey(this));
+		}
+		return descriptionId;
 	}
 
 	public int getLightLevel() {
@@ -92,7 +113,7 @@ public class FluidType {
 	}
 
 	public SoundEvent getSound(SoundAction arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getSound yet");
+		return sounds.get(arg0);
 	}
 
 	public double motionScale(Entity arg0) {
@@ -116,7 +137,8 @@ public class FluidType {
 	}
 
 	public boolean move(LivingEntity arg0, Vec3 arg1, double arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.move yet");
+		// false: the entity moves through the fluid the vanilla way.
+		return false;
 	}
 
 	public boolean canDrownIn(LivingEntity arg0) {
@@ -132,7 +154,7 @@ public class FluidType {
 	}
 
 	public boolean supportsBoating(FluidState arg0, AbstractBoat arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.supportsBoating yet");
+		return supportsBoating(arg1);
 	}
 
 	public boolean canRideVehicleUnder(Entity arg0, Entity arg1) {
@@ -144,7 +166,7 @@ public class FluidType {
 	}
 
 	public SoundEvent getSound(Entity arg0, SoundAction arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getSound yet");
+		return getSound(arg1);
 	}
 
 	public boolean canExtinguish(FluidState arg0, BlockGetter arg1, BlockPos arg2) {
@@ -164,7 +186,7 @@ public class FluidType {
 	}
 
 	public SoundEvent getSound(LivingEntity arg0, BlockGetter arg1, BlockPos arg2, SoundAction arg3) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getSound yet");
+		return getSound(arg3);
 	}
 
 	public boolean canHydrate(FluidState arg0, BlockGetter arg1, BlockState arg2, BlockPos arg3) {
@@ -172,19 +194,19 @@ public class FluidType {
 	}
 
 	public int getLightLevel(FluidState arg0, BlockAndLightGetter arg1, BlockPos arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getLightLevel yet");
+		return getLightLevel();
 	}
 
 	public int getDensity(FluidState arg0, BlockAndLightGetter arg1, BlockPos arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getDensity yet");
+		return getDensity();
 	}
 
 	public int getTemperature(FluidState arg0, BlockAndLightGetter arg1, BlockPos arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getTemperature yet");
+		return getTemperature();
 	}
 
 	public int getViscosity(FluidState arg0, BlockAndLightGetter arg1, BlockPos arg2) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getViscosity yet");
+		return getViscosity();
 	}
 
 	public boolean handleCauldronDrip(Fluid arg0, Level arg1, BlockPos arg2) {
@@ -200,15 +222,15 @@ public class FluidType {
 	}
 
 	public SoundEvent getSound(FluidStack arg0, SoundAction arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getSound yet");
+		return getSound(arg1);
 	}
 
 	public Component getDescription(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getDescription yet");
+		return Component.translatable(getDescriptionId(arg0));
 	}
 
 	public String getDescriptionId(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getDescriptionId yet");
+		return getDescriptionId();
 	}
 
 	public boolean canHydrate(FluidStack arg0) {
@@ -216,23 +238,23 @@ public class FluidType {
 	}
 
 	public int getLightLevel(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getLightLevel yet");
+		return getLightLevel();
 	}
 
 	public int getDensity(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getDensity yet");
+		return getDensity();
 	}
 
 	public int getTemperature(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getTemperature yet");
+		return getTemperature();
 	}
 
 	public int getViscosity(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getViscosity yet");
+		return getViscosity();
 	}
 
 	public Rarity getRarity(FluidStack arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.getRarity yet");
+		return getRarity();
 	}
 
 	public final boolean isAir() {
@@ -264,7 +286,7 @@ public class FluidType {
 	}
 
 	public final boolean isLighterThanAir() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.isLighterThanAir yet");
+		return getDensity() <= 0;
 	}
 
 	public boolean isVaporizedOnPlacement(Level arg0, BlockPos arg1, FluidStack arg2) {
@@ -276,7 +298,8 @@ public class FluidType {
 	}
 
 	public String toString() {
-		throw new UnsupportedOperationException("SteelWool does not implement FluidType.toString yet");
+		net.minecraft.resources.Identifier name = net.neoforged.neoforge.registries.NeoForgeRegistries.FLUID_TYPES.getKey(this);
+		return name != null ? name.toString() : "Unregistered FluidType";
 	}
 
 	public static record DripstoneDripInfo(float chance, ParticleOptions dripParticle, Block filledCauldron) {
@@ -305,92 +328,126 @@ public class FluidType {
 		private boolean isWaterLike;
 
 		private Properties() {
-			super();
-			throw new UnsupportedOperationException("SteelWool does not implement the FluidType.Properties constructor yet");
+			// Defaults match NeoForge's.
+			motionScale = 0.014;
+			canPushEntity = true;
+			canSwim = true;
+			canDrown = true;
+			fallDistanceModifier = 0.5F;
+			pathType = PathType.WATER;
+			adjacentPathType = PathType.WATER_BORDER;
+			sounds = new java.util.HashMap<>();
+			density = 1000;
+			temperature = 300;
+			viscosity = 1000;
+			rarity = Rarity.COMMON;
 		}
 
 		public static net.neoforged.neoforge.fluids.FluidType.Properties create() {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.create yet");
+			return new Properties();
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties descriptionId(String arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.descriptionId yet");
+			this.descriptionId = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties motionScale(double arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.motionScale yet");
+			this.motionScale = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties canPushEntity(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.canPushEntity yet");
+			this.canPushEntity = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties canSwim(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.canSwim yet");
+			this.canSwim = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties canDrown(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.canDrown yet");
+			this.canDrown = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties fallDistanceModifier(float arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.fallDistanceModifier yet");
+			this.fallDistanceModifier = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties canExtinguish(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.canExtinguish yet");
+			this.canExtinguish = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties canConvertToSource(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.canConvertToSource yet");
+			this.canConvertToSource = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties supportsBoating(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.supportsBoating yet");
+			this.supportsBoating = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties pathType(PathType arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.pathType yet");
+			this.pathType = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties adjacentPathType(PathType arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.adjacentPathType yet");
+			this.adjacentPathType = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties sound(SoundAction arg0, SoundEvent arg1) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.sound yet");
+			sounds.put(arg0, arg1);
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties canHydrate(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.canHydrate yet");
+			this.canHydrate = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties lightLevel(int arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.lightLevel yet");
+			this.lightLevel = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties density(int arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.density yet");
+			this.density = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties temperature(int arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.temperature yet");
+			this.temperature = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties viscosity(int arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.viscosity yet");
+			this.viscosity = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties rarity(Rarity arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.rarity yet");
+			this.rarity = arg0;
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties addDripstoneDripping(float arg0, ParticleOptions arg1, Block arg2, SoundEvent arg3) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.addDripstoneDripping yet");
+			if (arg3 != null) {
+				sounds.put(net.neoforged.neoforge.common.SoundActions.CAULDRON_DRIP, arg3);
+			}
+			dripInfo = new DripstoneDripInfo(arg0, arg1, arg2);
+			return this;
 		}
 
 		public net.neoforged.neoforge.fluids.FluidType.Properties isWaterLike(boolean arg0) {
-			throw new UnsupportedOperationException("SteelWool does not implement FluidType.Properties.isWaterLike yet");
+			this.isWaterLike = arg0;
+			return this;
 		}
 	}
 }

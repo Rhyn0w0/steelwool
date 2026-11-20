@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 TODO = 'throw new UnsupportedOperationException("SteelWool: TODO");'
-DECL = re.compile(r"^(\t*)(?:[\w<>\[\],.? @]+\s)?(\w+)\s*\([^;{]*\)\s*(?:throws [\w., ]+)?\{\s*$")
+DECL = re.compile(r"^(\t*)(?:[\w<>\[\],.? @&]+\s)?(\w+)\s*\([^;{]*\)\s*(?:throws [\w., ]+)?\{\s*$")
 TYPE = re.compile(r"^(\t*)(?:public |protected |private |static |final |abstract |sealed |non-sealed )*(?:class|interface|enum|record|@interface) (\w+)")
 FQN = re.compile(r"\b((?:net|java|javax|com|org|it|io)\.(?:[a-z_][a-z0-9_]*\.)+)([A-Z]\w*)")
 

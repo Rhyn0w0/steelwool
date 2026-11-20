@@ -59,6 +59,17 @@ public class ModFileInfo implements IModFileInfo, IConfigurable {
 		return config.getConfigList(key);
 	}
 
+	/** The {@code issueTrackerURL} from {@code neoforge.mods.toml}, or {@code null} if it is missing or invalid. */
+	public java.net.@org.jspecify.annotations.Nullable URL getIssueURL() {
+		return this.<String>getConfigElement("issueTrackerURL").map(url -> {
+			try {
+				return java.net.URI.create(url).toURL();
+			} catch (IllegalArgumentException | java.net.MalformedURLException e) {
+				return null;
+			}
+		}).orElse(null);
+	}
+
 	@Override
 	public String getLicense() {
 		return config.<String>getConfigElement("license").orElse("");

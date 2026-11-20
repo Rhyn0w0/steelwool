@@ -9,7 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
  */
 public interface AttachmentSyncHandler<T extends Object> {
 	default boolean sendToPlayer(IAttachmentHolder arg0, ServerPlayer arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement AttachmentSyncHandler.sendToPlayer yet");
+		return true;
 	}
 
 	void write(RegistryFriendlyByteBuf arg0, T arg1, boolean arg2);

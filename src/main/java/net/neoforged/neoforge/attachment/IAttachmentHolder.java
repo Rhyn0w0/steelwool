@@ -2,57 +2,58 @@ package net.neoforged.neoforge.attachment;
 
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
- * SteelWool re-implementation of NeoForge's {@code IAttachmentHolder}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
+ * Something data attachments can be attached to. SteelWool makes entities, block entities, chunks
+ * and levels implement it with mixins.
  */
 public interface IAttachmentHolder {
 	boolean hasAttachments();
 
-	boolean hasData(AttachmentType<?> arg0);
+	boolean hasData(AttachmentType<?> type);
 
-	default <T extends Object> boolean hasData(Supplier<AttachmentType<T>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.hasData yet");
+	default <T> boolean hasData(Supplier<AttachmentType<T>> type) {
+		return hasData(type.get());
 	}
 
-	<T extends Object> T getData(AttachmentType<T> arg0);
+	<T> T getData(AttachmentType<T> type);
 
-	default <T extends Object> T getData(Supplier<AttachmentType<T>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.getData yet");
+	default <T> T getData(Supplier<AttachmentType<T>> type) {
+		return getData(type.get());
 	}
 
-	default <T extends Object> Optional<T> getExistingData(AttachmentType<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.getExistingData yet");
+	default <T> Optional<T> getExistingData(AttachmentType<T> type) {
+		return Optional.ofNullable(getExistingDataOrNull(type));
 	}
 
-	default <T extends Object> Optional<T> getExistingData(Supplier<AttachmentType<T>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.getExistingData yet");
+	default <T> Optional<T> getExistingData(Supplier<AttachmentType<T>> type) {
+		return getExistingData(type.get());
 	}
 
-	<T extends Object> T getExistingDataOrNull(AttachmentType<T> arg0);
+	<T> @Nullable T getExistingDataOrNull(AttachmentType<T> type);
 
-	default <T extends Object> T getExistingDataOrNull(Supplier<AttachmentType<T>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.getExistingDataOrNull yet");
+	default <T> @Nullable T getExistingDataOrNull(Supplier<AttachmentType<T>> type) {
+		return getExistingDataOrNull(type.get());
 	}
 
-	<T extends Object> T setData(AttachmentType<T> arg0, T arg1);
+	<T> @Nullable T setData(AttachmentType<T> type, T data);
 
-	default <T extends Object> T setData(Supplier<AttachmentType<T>> arg0, T arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.setData yet");
+	default <T> @Nullable T setData(Supplier<AttachmentType<T>> type, T data) {
+		return setData(type.get(), data);
 	}
 
-	<T extends Object> T removeData(AttachmentType<T> arg0);
+	<T> @Nullable T removeData(AttachmentType<T> type);
 
-	default <T extends Object> T removeData(Supplier<AttachmentType<T>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.removeData yet");
+	default <T> @Nullable T removeData(Supplier<AttachmentType<T>> type) {
+		return removeData(type.get());
 	}
 
-	default void syncData(AttachmentType<?> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.syncData yet");
+	/** SteelWool does not sync attachments to clients yet, so this does nothing. */
+	default void syncData(AttachmentType<?> type) {
 	}
 
-	default void syncData(Supplier<? extends AttachmentType<?>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IAttachmentHolder.syncData yet");
+	default void syncData(Supplier<? extends AttachmentType<?>> type) {
+		syncData(type.get());
 	}
 }

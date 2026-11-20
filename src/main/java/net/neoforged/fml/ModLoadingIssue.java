@@ -16,31 +16,31 @@ public record ModLoadingIssue(net.neoforged.fml.ModLoadingIssue.Severity severit
 	}
 
 	public static net.neoforged.fml.ModLoadingIssue error(String arg0, Object... arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadingIssue.error yet");
+		return new ModLoadingIssue(Severity.ERROR, arg0, java.util.Arrays.asList(arg1));
 	}
 
 	public static net.neoforged.fml.ModLoadingIssue warning(String arg0, Object... arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadingIssue.warning yet");
+		return new ModLoadingIssue(Severity.WARNING, arg0, java.util.Arrays.asList(arg1));
 	}
 
 	public net.neoforged.fml.ModLoadingIssue withAffectedPath(Path arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadingIssue.withAffectedPath yet");
+		return new ModLoadingIssue(severity, translationKey, translationArgs, cause, arg0, affectedModFile, affectedMod);
 	}
 
 	public net.neoforged.fml.ModLoadingIssue withAffectedModFile(IModFile arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadingIssue.withAffectedModFile yet");
+		return new ModLoadingIssue(severity, translationKey, translationArgs, cause, affectedPath, arg0, affectedMod);
 	}
 
 	public net.neoforged.fml.ModLoadingIssue withAffectedMod(IModInfo arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadingIssue.withAffectedMod yet");
+		return new ModLoadingIssue(severity, translationKey, translationArgs, cause, affectedPath, affectedModFile, arg0);
 	}
 
 	public net.neoforged.fml.ModLoadingIssue withCause(Throwable arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadingIssue.withCause yet");
+		return new ModLoadingIssue(severity, translationKey, translationArgs, arg0, affectedPath, affectedModFile, affectedMod);
 	}
 
 	public net.neoforged.fml.ModLoadingIssue withSeverity(net.neoforged.fml.ModLoadingIssue.Severity arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement ModLoadingIssue.withSeverity yet");
+		return new ModLoadingIssue(arg0, translationKey, translationArgs, cause, affectedPath, affectedModFile, affectedMod);
 	}
 
 	public enum Severity {

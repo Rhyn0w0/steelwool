@@ -21,6 +21,14 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.fml.loading.LoadingModList;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.neoforged.neoforge.attachment.AttachmentType;
+import net.neoforged.neoforge.attachment.IAttachmentHolder;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.common.extensions.ILevelExtension;
 import net.neoforged.neoforge.server.permission.PermissionAPI;
@@ -119,6 +127,26 @@ public class SteelWoolGameTests {
 		helper.assertTrue("Hello from a custom registry".equals(registry.getValue(id("hello"))), Component.literal("The greetings registry has no hello entry"));
 		helper.assertTrue(BuiltInRegistries.REGISTRY.getValue(Identifier.fromNamespaceAndPath("neoforge", "attachment_types")) != null,
 				Component.literal("NeoForge's own registries were not added"));
+		helper.succeed();
+	}
+
+	@GameTest
+	public void dataAttachmentsAreSaved(GameTestHelper helper) {
+		@SuppressWarnings("unchecked")
+		AttachmentType<Integer> counter = ((java.util.function.Supplier<AttachmentType<Integer>>) testModField("TestMod", "COUNTER")).get();
+		Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 1, 1));
+		IAttachmentHolder holder = (IAttachmentHolder) pig;
+
+		helper.assertTrue(!holder.hasData(counter), Component.literal("A new entity should have no attachment"));
+		helper.assertTrue(holder.getData(counter) == 0, Component.literal("The default value should be 0"));
+		holder.setData(counter, 42);
+
+		TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
+		pig.saveWithoutId(output);
+		Entity copy = EntityTypes.PIG.create(helper.getLevel(), EntitySpawnReason.LOAD);
+		copy.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
+		helper.assertTrue(Integer.valueOf(42).equals(((IAttachmentHolder) copy).getExistingDataOrNull(counter)),
+				Component.literal("The attachment was not saved and loaded with the entity"));
 		helper.succeed();
 	}
 

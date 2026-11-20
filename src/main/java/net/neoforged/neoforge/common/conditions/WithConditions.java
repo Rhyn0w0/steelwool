@@ -8,6 +8,10 @@ import java.util.List;
  * Members that throw {@link UnsupportedOperationException} are not implemented yet.
  */
 public record WithConditions<A extends Object>(List<ICondition> conditions, A carrier) {
+	public WithConditions(A carrier, ICondition... conditions) {
+		this(java.util.List.of(conditions), carrier);
+	}
+
 	public WithConditions(A arg0) {
 		this(List.of(), arg0);
 	}

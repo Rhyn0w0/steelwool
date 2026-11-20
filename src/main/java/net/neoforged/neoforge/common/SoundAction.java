@@ -1,29 +1,27 @@
 package net.neoforged.neoforge.common;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * SteelWool re-implementation of NeoForge's {@code SoundAction}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
- */
+/** A named action a fluid can play a sound for, such as filling a bucket. There is one instance per name. */
 public final class SoundAction {
-	private static final Map<String, net.neoforged.neoforge.common.SoundAction> ACTIONS = null /* SteelWool: TODO */;
+	private static final Map<String, SoundAction> ACTIONS = new ConcurrentHashMap<>();
 	private final String name;
 
-	public static net.neoforged.neoforge.common.SoundAction get(String arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement SoundAction.get yet");
+	public static SoundAction get(String name) {
+		return ACTIONS.computeIfAbsent(name, SoundAction::new);
 	}
 
 	private SoundAction(String name) {
-		super();
 		this.name = name;
 	}
 
 	public String name() {
-		return this.name;
+		return name;
 	}
 
+	@Override
 	public String toString() {
-		throw new UnsupportedOperationException("SteelWool does not implement SoundAction.toString yet");
+		return "SoundAction[" + name + "]";
 	}
 }

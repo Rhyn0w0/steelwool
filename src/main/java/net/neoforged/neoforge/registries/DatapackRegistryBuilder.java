@@ -1,50 +1,62 @@
 package net.neoforged.neoforge.registries;
 
-import java.util.function.Consumer;
-
 import com.mojang.serialization.Codec;
+import java.util.Objects;
+import java.util.function.Consumer;
 import net.minecraft.core.Registry;
+import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.RegistryValidator;
 import net.minecraft.resources.ResourceKey;
+import org.jspecify.annotations.Nullable;
 
 /**
- * SteelWool re-implementation of NeoForge's {@code DatapackRegistryBuilder}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
+ * Describes a datapack registry for {@link NewDatapackRegistryEvent}. On SteelWool the validator
+ * and configurator are accepted but not used: Fabric's {@code DynamicRegistries} creates the registry.
  */
-public final class DatapackRegistryBuilder<T extends Object> extends Object {
+public final class DatapackRegistryBuilder<T> {
 	private final boolean reloadable;
-	private ResourceKey<Registry<T>> key;
-	private Codec<T> codec;
-	private Codec<T> networkCodec;
-	private RegistryValidator<T> validator;
-	private Consumer<RegistryBuilder<T>> configurator;
+	private @Nullable ResourceKey<Registry<T>> key;
+	private @Nullable Codec<T> codec;
+	private @Nullable Codec<T> networkCodec;
+	private RegistryValidator<T> validator = RegistryValidator.none();
+	private Consumer<RegistryBuilder<T>> configurator = builder -> {};
 
-	DatapackRegistryBuilder(boolean arg0) {
-		super();
-		throw new UnsupportedOperationException("SteelWool does not implement the DatapackRegistryBuilder constructor yet");
+	DatapackRegistryBuilder(boolean reloadable) {
+		this.reloadable = reloadable;
 	}
 
-	public net.neoforged.neoforge.registries.DatapackRegistryBuilder<T> key(ResourceKey<Registry<T>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement DatapackRegistryBuilder.key yet");
+	public DatapackRegistryBuilder<T> key(ResourceKey<Registry<T>> key) {
+		this.key = key;
+		return this;
 	}
 
-	public net.neoforged.neoforge.registries.DatapackRegistryBuilder<T> codec(Codec<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement DatapackRegistryBuilder.codec yet");
+	public DatapackRegistryBuilder<T> codec(Codec<T> codec) {
+		this.codec = codec;
+		return this;
 	}
 
-	public net.neoforged.neoforge.registries.DatapackRegistryBuilder<T> networkCodec(Codec<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement DatapackRegistryBuilder.networkCodec yet");
+	/** Syncs the registry to clients with this codec. Reloadable registries are not synced. */
+	public DatapackRegistryBuilder<T> networkCodec(Codec<T> networkCodec) {
+		if (reloadable) {
+			throw new IllegalStateException("Reloadable datapack registries cannot be synced");
+		}
+		this.networkCodec = networkCodec;
+		return this;
 	}
 
-	public net.neoforged.neoforge.registries.DatapackRegistryBuilder<T> validator(RegistryValidator<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement DatapackRegistryBuilder.validator yet");
+	public DatapackRegistryBuilder<T> validator(RegistryValidator<T> validator) {
+		this.validator = Objects.requireNonNull(validator);
+		return this;
 	}
 
-	public net.neoforged.neoforge.registries.DatapackRegistryBuilder<T> configurator(Consumer<RegistryBuilder<T>> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement DatapackRegistryBuilder.configurator yet");
+	public DatapackRegistryBuilder<T> configurator(Consumer<RegistryBuilder<T>> configurator) {
+		this.configurator = Objects.requireNonNull(configurator);
+		return this;
 	}
 
 	NewDatapackRegistryEvent.RegistryData<T> build() {
-		throw new UnsupportedOperationException("SteelWool does not implement DatapackRegistryBuilder.build yet");
+		Objects.requireNonNull(key, "Datapack registry key not set");
+		Objects.requireNonNull(codec, "Datapack registry codec not set");
+		return new NewDatapackRegistryEvent.RegistryData<>(new RegistryDataLoader.RegistryData<>(key, codec, validator), networkCodec);
 	}
 }

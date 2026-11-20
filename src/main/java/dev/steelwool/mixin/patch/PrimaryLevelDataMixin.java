@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.Mixin;
  * {@code hasConfirmedExperimentalWarning()} and {@code withConfirmedWarning(boolean)}. The flag is
  * not saved with the world.
  */
-@Mixin(PrimaryLevelData.class)
+@Mixin(value = PrimaryLevelData.class, priority = 500)
 public abstract class PrimaryLevelDataMixin {
 	@SuppressWarnings("unused")
 	private boolean confirmedExperimentalWarning;

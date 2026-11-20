@@ -9,12 +9,20 @@
 		"PlayerTickMixin",
 		"ServerLevelTickMixin",
 		"ServerCommonPacketListenerImplMixin",
+		"patch.ArgumentTypeInfosMixin",
+		"patch.BlockEntityAttachmentMixin",
+		"patch.BlockEntityTypeMixin",
+		"patch.ChunkAccessAttachmentMixin",
 		"patch.CreativeModeTabBuilderMixin",
 		"patch.CreativeModeTabMixin",
+		"patch.EntityAttachmentMixin",
 		"patch.EntityMixin",
 		"patch.ItemStackMixin",
+		"patch.LevelAttachmentMixin",
 		"patch.LevelMixin",
-		"patch.PrimaryLevelDataMixin"
+		"patch.PackMixin",
+		"patch.PrimaryLevelDataMixin",
+		"patch.ReloadableServerResourcesMixin"
 	],
 	"client": [
 		"client.ClientCommonPacketListenerImplMixin"

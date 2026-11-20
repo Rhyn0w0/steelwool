@@ -12,7 +12,8 @@ import net.minecraft.world.inventory.MenuType;
 public interface IContainerFactory<T extends AbstractContainerMenu> extends MenuType.MenuSupplier<T> {
 	T create(int arg0, Inventory arg1, RegistryFriendlyByteBuf arg2);
 
-	default T create(int arg0, Inventory arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement IContainerFactory.create yet");
+	/** Creates the menu without extra data (the buffer is {@code null}). */
+	default T create(int containerId, Inventory inventory) {
+		return create(containerId, inventory, null);
 	}
 }

@@ -18,8 +18,10 @@ public abstract class LootModifier implements IGlobalLootModifier {
 	protected final Optional<Holder<LootItemCondition>> condition;
 	protected final int priority;
 
-	protected static <T extends net.neoforged.neoforge.common.loot.LootModifier> Products.P2<RecordCodecBuilder.Mu<T>, Optional<Holder<LootItemCondition>>, Integer> codecStart(RecordCodecBuilder.Instance<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement LootModifier.codecStart yet");
+	protected static <T extends net.neoforged.neoforge.common.loot.LootModifier> Products.P2<RecordCodecBuilder.Mu<T>, Optional<Holder<LootItemCondition>>, Integer> codecStart(RecordCodecBuilder.Instance<T> instance) {
+		return instance.group(
+				LootItemCondition.CODEC.optionalFieldOf("condition").forGetter(modifier -> modifier.condition),
+				com.mojang.serialization.Codec.INT.optionalFieldOf("priority", IGlobalLootModifier.DEFAULT_PRIORITY).forGetter(modifier -> modifier.priority));
 	}
 
 	protected LootModifier(Optional<Holder<LootItemCondition>> condition, int priority) {
@@ -28,8 +30,12 @@ public abstract class LootModifier implements IGlobalLootModifier {
 		this.priority = priority;
 	}
 
-	public final ObjectArrayList<ItemStack> apply(ObjectArrayList<ItemStack> arg0, LootContext arg1) {
-		throw new UnsupportedOperationException("SteelWool does not implement LootModifier.apply yet");
+	/** Runs {@link #doApply} when there is no condition or the condition passes. */
+	public final ObjectArrayList<ItemStack> apply(ObjectArrayList<ItemStack> loot, LootContext context) {
+		if (condition.isPresent() && !condition.get().value().test(context)) {
+			return loot;
+		}
+		return doApply(loot, context);
 	}
 
 	public int priority() {

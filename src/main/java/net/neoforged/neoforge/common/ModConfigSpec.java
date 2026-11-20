@@ -133,7 +133,12 @@ public class ModConfigSpec implements IConfigSpec {
 	public enum RestartType {
 		NONE,
 		WORLD,
-		GAME
+		GAME;
+
+		/** The stricter of the two: a game restart outranks a world reload, which outranks none. */
+		public RestartType with(RestartType other) {
+			return other.ordinal() > ordinal() ? other : this;
+		}
 	}
 
 	public static class Builder {
@@ -408,6 +413,49 @@ public class ModConfigSpec implements IConfigSpec {
 
 		public <V extends Enum<V>> EnumValue<V> defineEnum(String path, V defaultValue, Predicate<Object> validator) {
 			return defineEnum(split(path), () -> defaultValue, EnumGetMethod.NAME_IGNORECASE, validator, defaultValue.getDeclaringClass());
+		}
+
+		@SafeVarargs
+		public final <V extends Enum<V>> EnumValue<V> defineEnum(String path, V defaultValue, EnumGetMethod converter, V... acceptableValues) {
+			return defineEnum(split(path), defaultValue, converter, Arrays.asList(acceptableValues));
+		}
+
+		@SafeVarargs
+		public final <V extends Enum<V>> EnumValue<V> defineEnum(List<String> path, V defaultValue, V... acceptableValues) {
+			return defineEnum(path, defaultValue, EnumGetMethod.NAME_IGNORECASE, Arrays.asList(acceptableValues));
+		}
+
+		@SafeVarargs
+		public final <V extends Enum<V>> EnumValue<V> defineEnum(List<String> path, V defaultValue, EnumGetMethod converter, V... acceptableValues) {
+			return defineEnum(path, defaultValue, converter, Arrays.asList(acceptableValues));
+		}
+
+		public <V extends Enum<V>> EnumValue<V> defineEnum(String path, V defaultValue, EnumGetMethod converter, Collection<V> acceptableValues) {
+			return defineEnum(split(path), defaultValue, converter, acceptableValues);
+		}
+
+		public <V extends Enum<V>> EnumValue<V> defineEnum(String path, V defaultValue, EnumGetMethod converter, Predicate<Object> validator) {
+			return defineEnum(split(path), () -> defaultValue, converter, validator, defaultValue.getDeclaringClass());
+		}
+
+		public <V extends Enum<V>> EnumValue<V> defineEnum(List<String> path, V defaultValue, Predicate<Object> validator) {
+			return defineEnum(path, () -> defaultValue, EnumGetMethod.NAME_IGNORECASE, validator, defaultValue.getDeclaringClass());
+		}
+
+		public <V extends Enum<V>> EnumValue<V> defineEnum(List<String> path, V defaultValue, EnumGetMethod converter, Predicate<Object> validator) {
+			return defineEnum(path, () -> defaultValue, converter, validator, defaultValue.getDeclaringClass());
+		}
+
+		public <V extends Enum<V>> EnumValue<V> defineEnum(String path, Supplier<V> defaultSupplier, Predicate<Object> validator, Class<V> clazz) {
+			return defineEnum(split(path), defaultSupplier, EnumGetMethod.NAME_IGNORECASE, validator, clazz);
+		}
+
+		public <V extends Enum<V>> EnumValue<V> defineEnum(String path, Supplier<V> defaultSupplier, EnumGetMethod converter, Predicate<Object> validator, Class<V> clazz) {
+			return defineEnum(split(path), defaultSupplier, converter, validator, clazz);
+		}
+
+		public <V extends Enum<V>> EnumValue<V> defineEnum(List<String> path, Supplier<V> defaultSupplier, Predicate<Object> validator, Class<V> clazz) {
+			return defineEnum(path, defaultSupplier, EnumGetMethod.NAME_IGNORECASE, validator, clazz);
 		}
 
 		public <V extends Enum<V>> EnumValue<V> defineEnum(List<String> path, Supplier<V> defaultSupplier, EnumGetMethod converter, Predicate<Object> validator, Class<V> clazz) {

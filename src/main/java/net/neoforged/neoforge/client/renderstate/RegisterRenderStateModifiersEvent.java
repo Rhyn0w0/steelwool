@@ -37,7 +37,7 @@ public class RegisterRenderStateModifiersEvent extends Event implements IModBusE
 	}
 
 	private static <T extends Avatar & ClientAvatarEntity> BiConsumer<?, ?> coerce(AvatarRenderStateModifier arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement RegisterRenderStateModifiersEvent.registerAvatarEntityModifier yet");
+		throw new UnsupportedOperationException("SteelWool does not implement RegisterRenderStateModifiersEvent.coerce yet");
 	}
 
 	public void registerMapModifier(BiConsumer<MapItemSavedData, MapRenderState> arg0) {

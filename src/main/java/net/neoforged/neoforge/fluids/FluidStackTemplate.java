@@ -22,6 +22,10 @@ public record FluidStackTemplate(Holder<Fluid> fluid, int amount, DataComponentP
 		this(arg0, arg1, DataComponentPatch.EMPTY);
 	}
 
+	public FluidStackTemplate(Fluid fluid, int amount, DataComponentPatch components) {
+		this(fluid.builtInRegistryHolder(), amount, components);
+	}
+
 	public FluidStackTemplate(Fluid arg0, int arg1) {
 		this(arg0.builtInRegistryHolder(), arg1, DataComponentPatch.EMPTY);
 	}

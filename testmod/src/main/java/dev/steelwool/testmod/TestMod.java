@@ -25,6 +25,8 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
+import com.mojang.serialization.Codec;
+import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -40,6 +42,7 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.neoforged.neoforge.registries.NewRegistryEvent;
 import net.neoforged.neoforge.registries.RegistryBuilder;
 import org.slf4j.Logger;
@@ -78,6 +81,11 @@ public class TestMod {
 	public static final DeferredRegister<String> GREETING_ENTRIES = DeferredRegister.create(GREETINGS_KEY, MODID);
 	public static final DeferredHolder<String, String> HELLO = GREETING_ENTRIES.register("hello", () -> "Hello from a custom registry");
 
+	/** A saved data attachment: an integer counter, 0 by default. */
+	public static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES = DeferredRegister.create(NeoForgeRegistries.Keys.ATTACHMENT_TYPES, MODID);
+	public static final DeferredHolder<AttachmentType<?>, AttachmentType<Integer>> COUNTER = ATTACHMENT_TYPES.register("counter",
+			() -> AttachmentType.builder(() -> 0).serialize(Codec.INT.fieldOf("value")).build());
+
 	/** A block capability that the test block provides. */
 	public static final BlockCapability<String, Void> GREETING_CAPABILITY = BlockCapability.createVoid(Identifier.fromNamespaceAndPath(MODID, "greeting"), String.class);
 
@@ -94,6 +102,7 @@ public class TestMod {
 		ITEMS.register(modEventBus);
 		CREATIVE_MODE_TABS.register(modEventBus);
 		GREETING_ENTRIES.register(modEventBus);
+		ATTACHMENT_TYPES.register(modEventBus);
 		modEventBus.addListener(NewRegistryEvent.class, event -> event.register(GREETINGS));
 		modEventBus.addListener(RegisterCapabilitiesEvent.class, event ->
 				event.registerBlock(GREETING_CAPABILITY, (level, pos, state, blockEntity, context) -> "Hello from " + pos.toShortString(), TEST_BLOCK.get()));

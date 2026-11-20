@@ -2,28 +2,35 @@ package net.neoforged.neoforge.common.util;
 
 import java.util.function.Supplier;
 
-/**
- * SteelWool re-implementation of NeoForge's {@code Lazy}, with the same API.
- * Members that throw {@link UnsupportedOperationException} are not implemented yet.
- */
-public final class Lazy<T extends Object> extends Object implements Supplier<T> {
+/** A value computed on first use and then cached, until {@link #invalidate()} is called. */
+public final class Lazy<T> implements Supplier<T> {
 	private final Supplier<T> delegate;
 	private volatile T cachedValue;
+	private volatile boolean computed;
 
-	public static <T extends Object> net.neoforged.neoforge.common.util.Lazy<T> of(Supplier<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement Lazy.of yet");
+	public static <T> Lazy<T> of(Supplier<T> supplier) {
+		return new Lazy<>(supplier);
 	}
 
 	public synchronized void invalidate() {
-		throw new UnsupportedOperationException("SteelWool does not implement Lazy.invalidate yet");
+		computed = false;
+		cachedValue = null;
 	}
 
 	private Lazy(Supplier<T> delegate) {
-		super();
 		this.delegate = delegate;
 	}
 
+	@Override
 	public T get() {
-		throw new UnsupportedOperationException("SteelWool does not implement Lazy.get yet");
+		if (!computed) {
+			synchronized (this) {
+				if (!computed) {
+					cachedValue = delegate.get();
+					computed = true;
+				}
+			}
+		}
+		return cachedValue;
 	}
 }

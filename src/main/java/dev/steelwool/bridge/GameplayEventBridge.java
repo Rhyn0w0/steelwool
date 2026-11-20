@@ -1,5 +1,6 @@
 package dev.steelwool.bridge;
 
+import dev.steelwool.attachment.SteelWoolAttachmentHolder;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
@@ -46,8 +47,12 @@ public final class GameplayEventBridge {
 				NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedInEvent(handler.player)));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 				NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(handler.player)));
-		ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) ->
-				NeoForge.EVENT_BUS.post(new PlayerEvent.Clone(newPlayer, oldPlayer, !alive)));
+		ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) -> {
+			// After death only copy-on-death attachments carry over; returning from the End keeps all of them.
+			((SteelWoolAttachmentHolder) oldPlayer).steelwool$attachments()
+					.copyTo(((SteelWoolAttachmentHolder) newPlayer).steelwool$attachments(), newPlayer.registryAccess(), !alive);
+			NeoForge.EVENT_BUS.post(new PlayerEvent.Clone(newPlayer, oldPlayer, !alive));
+		});
 		ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) ->
 				NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerRespawnEvent(newPlayer, alive)));
 		ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register((player, origin, destination) ->

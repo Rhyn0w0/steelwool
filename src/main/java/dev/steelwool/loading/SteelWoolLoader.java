@@ -21,6 +21,7 @@ import dev.steelwool.discovery.AnnotationScanResult;
 import dev.steelwool.discovery.NeoForgeModDiscovery;
 import dev.steelwool.discovery.NeoForgeModFile;
 import dev.steelwool.discovery.NeoForgeModMetadata;
+import dev.steelwool.registry.VanillaFluidTypes;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.impl.FabricLoaderImpl;
 import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweakerReader;
@@ -57,6 +58,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.registries.NewDatapackRegistryEvent;
 import net.neoforged.neoforge.registries.NewRegistryEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
 import org.jspecify.annotations.Nullable;
@@ -331,13 +333,18 @@ public final class SteelWoolLoader {
 
 	/**
 	 * Adds NeoForge's own registries, then lets mods add theirs. Both go into the root registry before
-	 * registration, so {@code RegisterEvent} fires for them too.
+	 * registration, so {@code RegisterEvent} fires for them too. Then lets mods add datapack registries.
 	 */
 	private void fireNewRegistryEvent() {
 		callHidden(NewRegistryEvent.class, null, "registerNeoForgeRegistries");
+		VanillaFluidTypes.register();
 		NewRegistryEvent event = construct(NewRegistryEvent.class);
 		postToAllModBuses(event);
 		callHidden(NewRegistryEvent.class, event, "fill");
+
+		NewDatapackRegistryEvent datapackEvent = construct(NewDatapackRegistryEvent.class);
+		postToAllModBuses(datapackEvent);
+		callHidden(NewDatapackRegistryEvent.class, datapackEvent, "process");
 	}
 
 	/** Calls a package-private no-argument method of a NeoForge API class (NeoForge calls it from its own package). */

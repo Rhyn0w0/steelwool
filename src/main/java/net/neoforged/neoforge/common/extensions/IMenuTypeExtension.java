@@ -11,8 +11,9 @@ import net.neoforged.neoforge.network.IContainerFactory;
  * Members that throw {@link UnsupportedOperationException} are not implemented yet.
  */
 public interface IMenuTypeExtension<T extends Object> {
-	static <T extends AbstractContainerMenu> MenuType<T> create(IContainerFactory<T> arg0) {
-		throw new UnsupportedOperationException("SteelWool does not implement IMenuTypeExtension.create yet");
+	/** A menu type whose client-side menu is created with the extra data the server sent when opening it. */
+	static <T extends AbstractContainerMenu> MenuType<T> create(IContainerFactory<T> factory) {
+		return new MenuType<>(factory, net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS);
 	}
 
 	T create(int arg0, Inventory arg1, RegistryFriendlyByteBuf arg2);
