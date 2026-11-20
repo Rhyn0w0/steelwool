@@ -137,12 +137,22 @@ public final class SteelWoolLoader {
 		publishLoadingModList();
 		result.libraries().forEach(lib -> FabricLauncherBase.getLauncher().addToClassPath(lib));
 
+		MixinConfigFilter mixinFilter = createMixinFilter();
+
 		for (NeoForgeModFile file : modFiles) {
 			FabricLauncherBase.getLauncher().addToClassPath(file.path());
 			file.libraries().forEach(lib -> FabricLauncherBase.getLauncher().addToClassPath(lib));
 
 			for (String mixinConfig : file.modsToml().mixinConfigs()) {
-				Mixins.addConfiguration(mixinConfig);
+				String config = mixinConfig;
+				if (mixinFilter != null) {
+					try {
+						config = mixinFilter.filter(file.path(), mixinConfig);
+					} catch (IOException | RuntimeException e) {
+						LOGGER.warn("Could not check mixin config {} of {}", mixinConfig, file.fileName(), e);
+					}
+				}
+				Mixins.addConfiguration(config);
 			}
 
 			applyAccessTransformers(file);
@@ -153,6 +163,30 @@ public final class SteelWoolLoader {
 		} else {
 			LOGGER.info("Found {} NeoForge mod(s) in {}: {}", modIdCount(), dir,
 					modFiles.stream().flatMap(f -> f.modsToml().mods().stream()).map(m -> m.modId() + " " + m.version()).toList());
+		}
+	}
+
+	/**
+	 * On a dedicated server, a filter that drops client-only mixins listed as common ones (see
+	 * {@link MixinConfigFilter}); {@code null} on the client, where every target exists.
+	 */
+	private static @Nullable MixinConfigFilter createMixinFilter() {
+		if (safeDist() != Dist.DEDICATED_SERVER) {
+			return null;
+		}
+		try {
+			Path dir = FabricLoader.getInstance().getGameDir().resolve(".steelwool").resolve("mixins");
+			if (Files.exists(dir)) {
+				try (var paths = Files.walk(dir)) {
+					paths.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+				}
+			}
+			Files.createDirectories(dir);
+			FabricLauncherBase.getLauncher().addToClassPath(dir);
+			return new MixinConfigFilter(dir, name -> classBytes(name) != null);
+		} catch (IOException e) {
+			LOGGER.warn("Could not set up mixin config filtering", e);
+			return null;
 		}
 	}
 

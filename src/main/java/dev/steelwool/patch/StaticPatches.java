@@ -52,4 +52,29 @@ public final class StaticPatches {
 	public static net.minecraft.util.datafix.@org.jspecify.annotations.Nullable DataFixTypes noDataFixType() {
 		return null;
 	}
+
+	/** The holder NeoForge passes to {@code BlockTransformer.transformBlock(context, holder)}: the transformer itself. */
+	public static net.minecraft.core.Holder<net.minecraft.core.component.BlockTransformer> blockTransformerHolder(net.minecraft.core.component.BlockTransformer transformer) {
+		return net.minecraft.core.Holder.direct(transformer);
+	}
+
+	/**
+	 * {@code HopperBlockEntity.getContainerOrHandlerAt(level, pos, side)}: the vanilla container at
+	 * {@code pos}; SteelWool does not look up item handler capabilities here.
+	 */
+	public static net.neoforged.neoforge.transfer.item.ContainerOrHandler hopperGetContainerOrHandlerAt(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos, net.minecraft.core.Direction side) {
+		net.minecraft.world.Container container = net.minecraft.world.level.block.entity.HopperBlockEntity.getContainerAt(level, pos);
+		return container != null ? new net.neoforged.neoforge.transfer.item.ContainerOrHandler(container, null) : net.neoforged.neoforge.transfer.item.ContainerOrHandler.EMPTY;
+	}
+
+	/** {@code RecipeType.simple(id)}: a recipe type that prints as its id, for registering. */
+	public static net.minecraft.world.item.crafting.RecipeType<?> recipeTypeSimple(net.minecraft.resources.Identifier id) {
+		String name = id.toString();
+		return new net.minecraft.world.item.crafting.RecipeType<>() {
+			@Override
+			public String toString() {
+				return name;
+			}
+		};
+	}
 }

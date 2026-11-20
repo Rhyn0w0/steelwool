@@ -8,9 +8,9 @@ import net.neoforged.neoforge.transfer.ResourceHandler;
  * Members that throw {@link UnsupportedOperationException} are not implemented yet.
  */
 public record ContainerOrHandler(Container container, ResourceHandler<ItemResource> itemHandler) {
-	public static final net.neoforged.neoforge.transfer.item.ContainerOrHandler EMPTY = null /* SteelWool: TODO */;
+	public static final net.neoforged.neoforge.transfer.item.ContainerOrHandler EMPTY = new ContainerOrHandler(null, null);
 
 	public boolean isEmpty() {
-		throw new UnsupportedOperationException("SteelWool does not implement ContainerOrHandler.isEmpty yet");
+		return container == null && itemHandler == null;
 	}
 }

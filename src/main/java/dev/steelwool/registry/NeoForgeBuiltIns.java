@@ -2,6 +2,7 @@ package dev.steelwool.registry;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.level.pathfinder.PathType;
@@ -15,6 +16,8 @@ import net.neoforged.neoforge.common.conditions.NotCondition;
 import net.neoforged.neoforge.common.conditions.OrCondition;
 import net.neoforged.neoforge.common.conditions.RegisteredCondition;
 import net.neoforged.neoforge.common.conditions.TagEmptyCondition;
+import net.neoforged.neoforge.common.world.NeoForgeAttributeTypes;
+import net.neoforged.neoforge.common.world.NeoForgeEnvironmentAttributes;
 import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
@@ -24,7 +27,9 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
  * <li>the fluid types of vanilla's fluids ({@code minecraft:empty}, {@code water} and {@code lava}),
  * which {@code NeoForgeMod.EMPTY_TYPE}, {@code WATER_TYPE} and {@code LAVA_TYPE} point to (their
  * sounds are not set);
- * <li>the built-in condition codecs ({@code neoforge:and}, {@code mod_loaded}, ...).
+ * <li>the built-in condition codecs ({@code neoforge:and}, {@code mod_loaded}, ...);
+ * <li>the {@code neoforge:identifier} attribute type and NeoForge's environment attributes
+ * ({@code neoforge:custom_clouds}, {@code custom_skybox}, {@code custom_weather_effects}).
  * </ul>
  */
 public final class NeoForgeBuiltIns {
@@ -34,6 +39,18 @@ public final class NeoForgeBuiltIns {
 	public static void register() {
 		registerFluidTypes();
 		registerConditions();
+		registerEnvironmentAttributes();
+	}
+
+	private static void registerEnvironmentAttributes() {
+		Registry.register(BuiltInRegistries.ATTRIBUTE_TYPE, neoforge("identifier"), NeoForgeAttributeTypes.IDENTIFIER);
+		Registry.register(BuiltInRegistries.ENVIRONMENT_ATTRIBUTE, neoforge("custom_weather_effects"), NeoForgeEnvironmentAttributes.CUSTOM_WEATHER_EFFECTS);
+		Registry.register(BuiltInRegistries.ENVIRONMENT_ATTRIBUTE, neoforge("custom_clouds"), NeoForgeEnvironmentAttributes.CUSTOM_CLOUDS);
+		Registry.register(BuiltInRegistries.ENVIRONMENT_ATTRIBUTE, neoforge("custom_skybox"), NeoForgeEnvironmentAttributes.CUSTOM_SKYBOX);
+	}
+
+	private static Identifier neoforge(String path) {
+		return Identifier.fromNamespaceAndPath("neoforge", path);
 	}
 
 	private static void registerConditions() {

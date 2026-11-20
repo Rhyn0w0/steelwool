@@ -25,6 +25,7 @@ from collections import defaultdict
 from pathlib import Path
 
 PREFIX = "net/neoforged/"
+SIGNATURE_TYPE = re.compile(r"\b(net\.neoforged\.[\w.]+\.[A-Z][\w$]*)")
 REF = re.compile(r"// (Method|InterfaceMethod|Field|class) ([\w/$]+)(?:\.([\w<>$]+):(\S+))?")
 HEADER = re.compile(r"^(?:[\w ]+ )?(?:class|interface|enum|record|@interface) ([\w.$]+)(?:<.*?>)?(?: extends ([\w.$]+))?")
 MEMBER = re.compile(r"^\s+(?:[\w.$<>\[\], ?]+ )?([\w$<>]+)\(.*\);?$|^\s+(?:[\w.$<>\[\], ?]+ )([\w$]+);$")
@@ -130,6 +131,14 @@ def main() -> None:
             for jar in expand(Path(mod), mod_dir):
                 own = set(classes(jar))
                 text = run_javap(tool, jar, sorted(own), ["-c", "-p"])
+                # Types in the signatures of the mod's own fields and methods (such as an event
+                # handler's parameter) must exist too, even if the code never names them.
+                for line in text.splitlines():
+                    if line.startswith("  ") and not line.startswith("   ") and ("(" in line or line.rstrip().endswith(";")):
+                        for owner in SIGNATURE_TYPE.findall(line):
+                            owner = owner.replace(".", "/")
+                            if owner not in own and owner not in members:
+                                missing_classes[owner].add(Path(mod).name)
                 for kind, owner, name, _desc in REF.findall(text):
                     owner = owner.lstrip("[L").rstrip(";")
                     if not owner.startswith(PREFIX) or owner in own:

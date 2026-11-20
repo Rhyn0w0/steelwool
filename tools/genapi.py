@@ -409,7 +409,7 @@ def render_class(jar, fqcn, all_texts, indent, nested=False):
             throws = " throws " + src_type(d.split(") throws ")[1])
         if is_interface:
             mods_ret = mods_ret.replace("public abstract ", "").replace("public ", "").replace("abstract ", "")
-            if not abstract and not static and "default " not in mods_ret:
+            if not abstract and not static and "default " not in mods_ret and not mods_ret.lstrip().startswith("private "):
                 mods_ret = "default " + mods_ret
         varargs = "ACC_VARARGS" in m.flags
         if abstract:

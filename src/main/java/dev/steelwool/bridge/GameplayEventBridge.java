@@ -1,6 +1,8 @@
 package dev.steelwool.bridge;
 
 import dev.steelwool.attachment.SteelWoolAttachmentHolder;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents;
+import net.neoforged.neoforge.common.extensions.IBlockEntityExtension;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
@@ -43,6 +45,8 @@ public final class GameplayEventBridge {
 	}
 
 	public static void register() {
+		// NeoForge calls BlockEntity.onLoad() when a block entity is added to a level.
+		ServerBlockEntityEvents.BLOCK_ENTITY_LOAD.register((blockEntity, level) -> ((IBlockEntityExtension) blockEntity).onLoad());
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 				NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedInEvent(handler.player)));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
