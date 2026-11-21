@@ -39,6 +39,7 @@ public class DeferredRegister<T> {
 	private final String namespace;
 	private final Map<DeferredHolder<T, ? extends T>, Supplier<? extends T>> entries = new LinkedHashMap<>();
 	private final Set<DeferredHolder<T, ? extends T>> entriesView = Collections.unmodifiableSet(entries.keySet());
+	private @org.jspecify.annotations.Nullable Registry<T> customRegistry;
 	private boolean seenRegisterEvent;
 	private boolean registeredEventBus;
 
@@ -120,6 +121,33 @@ public class DeferredRegister<T> {
 
 		this.registeredEventBus = true;
 		bus.addListener(RegisterEvent.class, this::addEntries);
+
+		if (this.customRegistry != null) {
+			Registry<T> registry = this.customRegistry;
+			bus.addListener(NewRegistryEvent.class, event -> event.register(registry));
+		}
+	}
+
+	/**
+	 * Creates a new registry for this register's registry key; it is added in {@link NewRegistryEvent}
+	 * once this register is {@linkplain #register(IEventBus) registered} to a mod event bus.
+	 */
+	public Registry<T> makeRegistry(java.util.function.Consumer<RegistryBuilder<T>> consumer) {
+		if (this.registeredEventBus) {
+			throw new IllegalStateException("Cannot create a registry after the DeferredRegister is registered to an event bus");
+		}
+		if (this.customRegistry != null) {
+			throw new IllegalStateException("This DeferredRegister already created a registry");
+		}
+		RegistryBuilder<T> builder = new RegistryBuilder<>(this.registryKey);
+		consumer.accept(builder);
+		this.customRegistry = builder.create();
+		return this.customRegistry;
+	}
+
+	/** Makes lookups of {@code from}, when nothing is registered under it, find {@code to} instead. */
+	public void addAlias(Identifier from, Identifier to) {
+		dev.steelwool.registry.RegistryAliases.add(this.registryKey, from, to);
 	}
 
 	public Collection<DeferredHolder<T, ? extends T>> getEntries() {

@@ -2,6 +2,7 @@ package dev.steelwool.discovery;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -12,8 +13,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.jar.Manifest;
 import java.util.stream.Stream;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -27,6 +33,12 @@ public final class NeoForgeModDiscovery {
 	static final String MODS_TOML = "META-INF/neoforge.mods.toml";
 	static final String LEGACY_FORGE_TOML = "META-INF/mods.toml";
 	static final String JARJAR_DIR = "META-INF/jarjar";
+	/**
+	 * Language loaders SteelWool can run. The Kotlin loaders (Kotlin for Forge's {@code kotlinforforge} and
+	 * KotlinLangForge's {@code klf}) work like {@code javafml}, except that a Kotlin {@code object} mod class
+	 * is used through its {@code INSTANCE} field.
+	 */
+	static final List<String> SUPPORTED_LOADERS = List.of("javafml", "kotlinforforge", "klf");
 
 	private final Path jarJarCache;
 
@@ -41,17 +53,20 @@ public final class NeoForgeModDiscovery {
 	 * Result of a discovery run.
 	 *
 	 * @param mods    NeoForge mod jars, top-level and nested, in load order
-	 * @param skipped jars that were ignored, with the reason
+	 * @param libraries library jars that are not mods: top-level jars marked {@code FMLModType: LIBRARY} /
+	 *                  {@code GAMELIBRARY} or that only bundle other jars, and the plain jars nested in them
+	 * @param skipped   jars that were ignored, with the reason
 	 */
-	public record Result(List<NeoForgeModFile> mods, Map<Path, String> skipped) {
+	public record Result(List<NeoForgeModFile> mods, List<Path> libraries, Map<Path, String> skipped) {
 	}
 
 	public Result discover(Path folder) throws IOException {
 		List<NeoForgeModFile> mods = new ArrayList<>();
+		List<Path> libraries = new ArrayList<>();
 		Map<Path, String> skipped = new HashMap<>();
 
 		if (!Files.isDirectory(folder)) {
-			return new Result(mods, skipped);
+			return new Result(mods, libraries, skipped);
 		}
 
 		List<Path> jars;
@@ -63,10 +78,10 @@ public final class NeoForgeModDiscovery {
 		}
 
 		for (Path jar : jars) {
-			readJar(jar, mods, skipped, true);
+			readJar(jar, null, mods, libraries, skipped);
 		}
 
-		return new Result(mods, skipped);
+		return new Result(mods, libraries, skipped);
 	}
 
 	static boolean isCandidate(Path path) {
@@ -74,13 +89,24 @@ public final class NeoForgeModDiscovery {
 		return Files.isRegularFile(path) && name.endsWith(".jar") && !name.startsWith(".");
 	}
 
-	private void readJar(Path jar, List<NeoForgeModFile> mods, Map<Path, String> skipped, boolean topLevel) throws IOException {
+	private void readJar(Path jar, @Nullable Path parent, List<NeoForgeModFile> mods, List<Path> topLibraries, Map<Path, String> skipped) throws IOException {
+		boolean topLevel = parent == null;
+
 		try (FileSystem fs = FileSystems.newFileSystem(jar)) {
 			Path root = fs.getPath("/");
 			Path toml = root.resolve(MODS_TOML);
 
 			if (!Files.exists(toml)) {
-				if (topLevel) {
+				if (topLevel && isLibrary(root)) {
+					// A library jar (e.g. Kotlin for Forge) or a jar that only bundles other jars.
+					topLibraries.add(jar);
+					List<Path> nestedMods = new ArrayList<>();
+					extractJarJar(jar, root, nestedMods, topLibraries);
+
+					for (Path nested : nestedMods) {
+						readJar(nested, jar, mods, topLibraries, skipped);
+					}
+				} else if (topLevel) {
 					String reason = Files.exists(root.resolve(LEGACY_FORGE_TOML))
 							? "it is a (Lex) Forge mod, not a NeoForge mod"
 							: Files.exists(root.resolve("fabric.mod.json"))
@@ -98,8 +124,8 @@ public final class NeoForgeModDiscovery {
 				modsToml = ModsTomlParser.parse(in, implementationVersion(root));
 			}
 
-			if (!"javafml".equals(modsToml.modLoader())) {
-				skipped.put(jar, "it uses the unsupported mod loader '" + modsToml.modLoader() + "' (only javafml is supported)");
+			if (!SUPPORTED_LOADERS.contains(modsToml.modLoader())) {
+				skipped.put(jar, "it uses the unsupported mod loader '" + modsToml.modLoader() + "' (supported: " + String.join(", ", SUPPORTED_LOADERS) + ")");
 				return;
 			}
 
@@ -118,31 +144,90 @@ public final class NeoForgeModDiscovery {
 			// Jar-in-jar: nested NeoForge mods are loaded as mods, anything else as a library.
 			List<Path> libraries = new ArrayList<>();
 			List<Path> nestedMods = new ArrayList<>();
-			Path jarJar = root.resolve(JARJAR_DIR);
+			extractJarJar(jar, root, nestedMods, libraries);
 
-			if (Files.isDirectory(jarJar)) {
-				try (Stream<Path> nested = Files.list(jarJar)) {
-					for (Path inner : (Iterable<Path>) nested.filter(p -> p.toString().endsWith(".jar")).sorted()::iterator) {
-						Path extracted = extract(jar, inner);
-
-						if (containsModsToml(extracted)) {
-							nestedMods.add(extracted);
-						} else {
-							libraries.add(extracted);
-						}
-					}
-				}
-			}
-
-			mods.add(new NeoForgeModFile(jar, modsToml, scanner.result(), libraries));
+			mods.add(new NeoForgeModFile(jar, modsToml, scanner.result(), libraries, parent));
 
 			for (Path nested : nestedMods) {
-				readJar(nested, mods, skipped, false);
+				readJar(nested, jar, mods, topLibraries, skipped);
 			}
 		}
 	}
 
+	/**
+	 * Extracts the jars bundled inside a jar, sorting them into NeoForge mods and plain libraries. Like NeoForge,
+	 * it reads them from the {@code path}s in {@code META-INF/jarjar/metadata.json}, which may point anywhere in the
+	 * jar (KotlinLangForge uses {@code META-INF/jars/}). Jars directly in {@code META-INF/jarjar/} are included too.
+	 */
+	private void extractJarJar(Path jar, Path root, List<Path> nestedMods, List<Path> libraries) throws IOException {
+		Path jarJar = root.resolve(JARJAR_DIR);
+
+		if (!Files.isDirectory(jarJar)) {
+			return;
+		}
+
+		Set<Path> inners = new TreeSet<>();
+
+		for (String path : jarJarMetadataPaths(jarJar.resolve("metadata.json"))) {
+			Path inner = root.resolve(path);
+
+			if (Files.isRegularFile(inner)) {
+				inners.add(inner);
+			} else {
+				LOGGER.warn("{} lists the nested jar {}, which it does not contain", jar.getFileName(), path);
+			}
+		}
+
+		try (Stream<Path> nested = Files.list(jarJar)) {
+			nested.filter(p -> p.toString().endsWith(".jar")).forEach(inners::add);
+		}
+
+		for (Path inner : inners) {
+			Path extracted = extract(jar, inner);
+
+			if (containsModsToml(extracted)) {
+				nestedMods.add(extracted);
+			} else {
+				libraries.add(extracted);
+			}
+		}
+	}
+
+	/** The {@code jars[].path} entries of a jar-in-jar {@code metadata.json}, or none if it is missing or unreadable. */
+	static List<String> jarJarMetadataPaths(Path metadata) {
+		if (!Files.exists(metadata)) {
+			return List.of();
+		}
+
+		try (Reader reader = Files.newBufferedReader(metadata)) {
+			List<String> paths = new ArrayList<>();
+
+			for (JsonElement entry : JsonParser.parseReader(reader).getAsJsonObject().getAsJsonArray("jars")) {
+				paths.add(entry.getAsJsonObject().get("path").getAsString());
+			}
+
+			return paths;
+		} catch (IOException | RuntimeException e) {
+			LOGGER.warn("Could not read {}: {}", metadata, e.toString());
+			return List.of();
+		}
+	}
+
+	/** A jar without a mods.toml that NeoForge would still load: a declared library, or a jar-in-jar container. */
+	private static boolean isLibrary(Path root) throws IOException {
+		if (Files.isDirectory(root.resolve(JARJAR_DIR))) {
+			return true;
+		}
+
+		String modType = manifestAttribute(root, "FMLModType");
+		return "LIBRARY".equals(modType) || "GAMELIBRARY".equals(modType);
+	}
+
 	private static @Nullable String implementationVersion(Path root) throws IOException {
+		return manifestAttribute(root, "Implementation-Version");
+	}
+
+	private static @Nullable String manifestAttribute(Path root, String name) throws IOException {
 		Path manifest = root.resolve("META-INF/MANIFEST.MF");
 
 		if (!Files.exists(manifest)) {
@@ -150,7 +235,7 @@ public final class NeoForgeModDiscovery {
 		}
 
 		try (InputStream in = Files.newInputStream(manifest)) {
-			return new Manifest(in).getMainAttributes().getValue("Implementation-Version");
+			return new Manifest(in).getMainAttributes().getValue(name);
 		}
 	}
 

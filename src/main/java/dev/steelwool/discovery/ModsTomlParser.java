@@ -6,7 +6,9 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 import com.electronwill.nightconfig.core.UnmodifiableConfig;
@@ -57,12 +59,18 @@ public final class ModsTomlParser {
 				version = jarVersion != null ? jarVersion : "0.0NONE";
 			}
 
+			Map<String, Object> config = toMap(mod);
+			config.put("version", version);
+			Object props = toml.get(List.of("modproperties", modId));
+
 			mods.add(new NeoForgeModMetadata(
 					modId,
 					version,
 					mod.getOrElse("displayName", modId),
 					mod.getOrElse("description", "").strip(),
-					dependencies(toml, modId)));
+					dependencies(toml, modId),
+					config,
+					props instanceof UnmodifiableConfig c ? toMap(c) : Map.of()));
 		}
 
 		if (mods.isEmpty()) {
@@ -89,7 +97,7 @@ public final class ModsTomlParser {
 			}
 		}
 
-		return new ModsToml(modLoader, license, mods, mixins, ats);
+		return new ModsToml(modLoader, license, mods, mixins, ats, toMap(toml));
 	}
 
 	private static List<NeoForgeModMetadata.Dependency> dependencies(UnmodifiableConfig toml, String modId) {
@@ -112,12 +120,51 @@ public final class ModsTomlParser {
 							depId,
 							type,
 							dep.getOrElse("versionRange", ""),
-							dep.getOrElse("side", "BOTH").toUpperCase(Locale.ROOT)));
+							dep.getOrElse("side", "BOTH").toUpperCase(Locale.ROOT),
+							dep.getOrElse("ordering", "NONE").toUpperCase(Locale.ROOT),
+							dep.get("reason") instanceof String reason ? reason : null));
 				}
 			}
 		}
 
 		return result;
+	}
+
+	/** Converts a night-config tree to plain maps and lists (no null values, which {@link Map#copyOf} rejects). */
+	static Map<String, Object> toMap(UnmodifiableConfig config) {
+		Map<String, Object> map = new LinkedHashMap<>();
+
+		for (UnmodifiableConfig.Entry entry : config.entrySet()) {
+			Object value = convert(entry.getRawValue());
+
+			if (value != null) {
+				map.put(entry.getKey(), value);
+			}
+		}
+
+		return map;
+	}
+
+	private static @Nullable Object convert(@Nullable Object value) {
+		if (value instanceof UnmodifiableConfig config) {
+			return toMap(config);
+		}
+
+		if (value instanceof List<?> list) {
+			List<Object> result = new ArrayList<>();
+
+			for (Object element : list) {
+				Object converted = convert(element);
+
+				if (converted != null) {
+					result.add(converted);
+				}
+			}
+
+			return result;
+		}
+
+		return value instanceof com.electronwill.nightconfig.core.NullObject ? null : value;
 	}
 
 	private static List<UnmodifiableConfig> configList(UnmodifiableConfig toml, String key) {
