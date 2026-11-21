@@ -49,6 +49,10 @@ dependencies {
 	implementation "com.electronwill.night-config:toml:${project.night_config_version}"
 	include "com.electronwill.night-config:toml:${project.night_config_version}"
 
+	// Maven version types used by FML's mod metadata API (IModInfo.getVersion(), dependency ranges).
+	implementation "org.apache.maven:maven-artifact:${project.maven_artifact_version}"
+	include "org.apache.maven:maven-artifact:${project.maven_artifact_version}"
+
 	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
 	testImplementation 'org.junit.jupiter:junit-jupiter'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -62,6 +66,9 @@ def testmodJar = gradle.includedBuild('testmod').task(':jar')
 def testmodLibs = file('testmod/build/libs').absolutePath
 
 loom {
+	// NeoForge's access transformers as a Fabric access widener (see generateNeoForgeAccessWidener).
+	accessWidenerPath = file('src/main/resources/steelwool.accesswidener')
+
 	runs {
 		configureEach {
 			if (name == 'gameTest' || name == 'clientGameTest') {
@@ -73,6 +80,29 @@ loom {
 
 tasks.matching { it.name == 'runGameTest' || it.name == 'runClientGameTest' }.configureEach {
 	dependsOn testmodJar
+}
+
+// ./gradlew generateNeoForgeAccessWidener -> regenerates src/main/resources/steelwool.accesswidener
+// from the access transformers in the NeoForge version SteelWool targets. Run it after changing
+// neoforge_version.
+configurations {
+	neoforgeUniversal { transitive = false }
+}
+
+dependencies {
+	neoforgeUniversal "net.neoforged:neoforge:${project.neoforge_version}:universal"
+}
+
+tasks.register('generateNeoForgeAccessWidener', JavaExec) {
+	group = 'steelwool'
+	description = "Translates NeoForge's access transformers into steelwool.accesswidener."
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'dev.steelwool.tools.GenerateNeoForgeAccessWidener'
+	def universal = configurations.neoforgeUniversal
+	def out = file('src/main/resources/steelwool.accesswidener')
+	// Loom's copy of vanilla Minecraft: the classes on the class path already have the widener applied.
+	def vanilla = new File(gradle.gradleUserHomeDir, "caches/fabric-loom/${project.minecraft_version}/minecraft-merged.jar")
+	argumentProviders.add({ [universal.singleFile.absolutePath, out.absolutePath, vanilla.absolutePath] } as CommandLineArgumentProvider)
 }
 
 // ---- Test bundle: everything needed to try SteelWool in a normal Minecraft install ----

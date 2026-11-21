@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 public final class SteelWoolConfigs {
 	private static final Logger LOGGER = LoggerFactory.getLogger("SteelWool/Configs");
 	private static final List<ModConfig> CONFIGS = new ArrayList<>();
-	private static boolean loaded;
+	private static final java.util.Set<ModConfig.Type> LOADED_TYPES = java.util.EnumSet.noneOf(ModConfig.Type.class);
 
 	private SteelWoolConfigs() {
 	}
@@ -35,18 +35,37 @@ public final class SteelWoolConfigs {
 	public static synchronized void register(ModConfig config) {
 		CONFIGS.add(config);
 
-		// Configs registered after the initial load (unusual) are loaded straight away.
-		if (loaded) {
+		// Startup configs load as soon as they are registered, like NeoForge; configs registered
+		// after their type was loaded (unusual) are loaded straight away too.
+		if (config.getType() == ModConfig.Type.STARTUP || LOADED_TYPES.contains(config.getType())) {
 			load(config);
 		}
 	}
 
-	/** Loads every registered config and fires {@link ModConfigEvent.Loading} for each. */
+	/**
+	 * Loads the local and client configs (NeoForge loads these after constructing mods) and fires
+	 * {@link ModConfigEvent.Loading} for each. Synced configs wait for {@link #loadSynced()}.
+	 */
 	public static synchronized void loadAll() {
-		loaded = true;
+		loadType(ModConfig.Type.LOCAL);
+		loadType(ModConfig.Type.CLIENT);
+	}
+
+	/**
+	 * Loads the synced configs, which NeoForge loads when a server starts (after registration, so
+	 * they can refer to registered objects). SteelWool keeps them in {@code config/}, not per world.
+	 */
+	public static synchronized void loadSynced() {
+		loadType(ModConfig.Type.SYNCED);
+	}
+
+	private static void loadType(ModConfig.Type type) {
+		LOADED_TYPES.add(type);
 
 		for (ModConfig config : List.copyOf(CONFIGS)) {
-			load(config);
+			if (config.getType() == type) {
+				load(config);
+			}
 		}
 	}
 

@@ -2,6 +2,9 @@ package dev.steelwool.loading;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,17 +16,25 @@ import java.util.Set;
 import java.util.function.BiFunction;
 
 import dev.steelwool.config.SteelWoolConfigs;
+import dev.steelwool.discovery.AccessTransformers;
 import dev.steelwool.discovery.AnnotationScanResult;
 import dev.steelwool.discovery.NeoForgeModDiscovery;
 import dev.steelwool.discovery.NeoForgeModFile;
 import dev.steelwool.discovery.NeoForgeModMetadata;
+import dev.steelwool.registry.NeoForgeBuiltIns;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.impl.FabricLoaderImpl;
+import net.fabricmc.loader.impl.lib.classtweaker.api.ClassTweakerReader;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.Event;
 import net.neoforged.fml.DeferredWorkQueue;
@@ -39,8 +50,18 @@ import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
 import net.neoforged.fml.event.lifecycle.InterModProcessEvent;
 import net.neoforged.fml.javafmlmod.FMLModContainer;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.fml.loading.LoadingModList;
+import net.neoforged.fml.loading.moddiscovery.ModFile;
+import net.neoforged.fml.loading.moddiscovery.ModInfo;
+import net.neoforged.neoforgespi.language.IModInfo;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.registries.NewDatapackRegistryEvent;
+import net.neoforged.neoforge.registries.NewRegistryEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixins;
@@ -66,6 +87,7 @@ public final class SteelWoolLoader {
 
 	private List<NeoForgeModFile> modFiles = List.of();
 	private final List<FMLModContainer> containers = new ArrayList<>();
+	private final Map<String, ModInfo> modInfos = new HashMap<>();
 	private boolean attached;
 
 	private SteelWoolLoader() {
@@ -102,6 +124,8 @@ public final class SteelWoolLoader {
 
 		try {
 			Files.createDirectories(dir);
+			// Mixin config plugins of NeoForge mods may write their own config files before the game creates config/.
+			Files.createDirectories(FabricLoader.getInstance().getConfigDir());
 			result = new NeoForgeModDiscovery(FabricLoader.getInstance().getGameDir().resolve(".steelwool").resolve("jarjar")).discover(dir);
 		} catch (IOException e) {
 			throw new UncheckedIOException("SteelWool could not read NeoForge mods from " + dir, e);
@@ -110,19 +134,28 @@ public final class SteelWoolLoader {
 		result.skipped().forEach((path, reason) -> LOGGER.warn("Ignoring {} in {}: {}", path.getFileName(), dir, reason));
 		modFiles = List.copyOf(result.mods());
 		validate(modFiles);
+		publishLoadingModList();
+		result.libraries().forEach(lib -> FabricLauncherBase.getLauncher().addToClassPath(lib));
+
+		MixinConfigFilter mixinFilter = createMixinFilter();
 
 		for (NeoForgeModFile file : modFiles) {
 			FabricLauncherBase.getLauncher().addToClassPath(file.path());
 			file.libraries().forEach(lib -> FabricLauncherBase.getLauncher().addToClassPath(lib));
 
 			for (String mixinConfig : file.modsToml().mixinConfigs()) {
-				Mixins.addConfiguration(mixinConfig);
+				String config = mixinConfig;
+				if (mixinFilter != null) {
+					try {
+						config = mixinFilter.filter(file.path(), mixinConfig);
+					} catch (IOException | RuntimeException e) {
+						LOGGER.warn("Could not check mixin config {} of {}", mixinConfig, file.fileName(), e);
+					}
+				}
+				Mixins.addConfiguration(config);
 			}
 
-			if (!file.modsToml().accessTransformers().isEmpty()) {
-				LOGGER.warn("{} declares access transformers {}; SteelWool does not apply access transformers yet",
-						file.fileName(), file.modsToml().accessTransformers());
-			}
+			applyAccessTransformers(file);
 		}
 
 		if (modFiles.isEmpty()) {
@@ -130,6 +163,104 @@ public final class SteelWoolLoader {
 		} else {
 			LOGGER.info("Found {} NeoForge mod(s) in {}: {}", modIdCount(), dir,
 					modFiles.stream().flatMap(f -> f.modsToml().mods().stream()).map(m -> m.modId() + " " + m.version()).toList());
+		}
+	}
+
+	/**
+	 * On a dedicated server, a filter that drops client-only mixins listed as common ones (see
+	 * {@link MixinConfigFilter}); {@code null} on the client, where every target exists.
+	 */
+	private static @Nullable MixinConfigFilter createMixinFilter() {
+		if (safeDist() != Dist.DEDICATED_SERVER) {
+			return null;
+		}
+		try {
+			Path dir = FabricLoader.getInstance().getGameDir().resolve(".steelwool").resolve("mixins");
+			if (Files.exists(dir)) {
+				try (var paths = Files.walk(dir)) {
+					paths.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+				}
+			}
+			Files.createDirectories(dir);
+			FabricLauncherBase.getLauncher().addToClassPath(dir);
+			return new MixinConfigFilter(dir, name -> classBytes(name) != null);
+		} catch (IOException e) {
+			LOGGER.warn("Could not set up mixin config filtering", e);
+			return null;
+		}
+	}
+
+	/** FML's default when {@code neoforge.mods.toml} lists no access transformers. */
+	private static final String DEFAULT_ACCESS_TRANSFORMER = "META-INF/accesstransformer.cfg";
+
+	/**
+	 * Applies a mod's access transformers by translating them to Fabric access widener entries, which
+	 * Fabric applies to classes as they load. Classes already loaded at this point are not changed.
+	 */
+	private static void applyAccessTransformers(NeoForgeModFile file) {
+		List<String> declared = file.modsToml().accessTransformers();
+
+		try (FileSystem fs = FileSystems.newFileSystem(file.path())) {
+			List<String> paths = declared.isEmpty() && Files.exists(fs.getPath(DEFAULT_ACCESS_TRANSFORMER)) ? List.of(DEFAULT_ACCESS_TRANSFORMER) : declared;
+			List<AccessTransformers.Entry> entries = new ArrayList<>();
+
+			for (String atPath : paths) {
+				Path at = fs.getPath(atPath);
+
+				if (!Files.exists(at)) {
+					LOGGER.warn("{} declares access transformer {}, which is not in the jar", file.fileName(), atPath);
+					continue;
+				}
+
+				try (var reader = Files.newBufferedReader(at)) {
+					entries.addAll(AccessTransformers.parse(reader));
+				}
+			}
+
+			if (entries.isEmpty()) {
+				return;
+			}
+
+			List<String> problems = new ArrayList<>();
+			List<String> lines = AccessTransformers.toAccessWidener(entries, SteelWoolLoader::classBytes, problems);
+			problems.forEach(p -> LOGGER.debug("{}: skipping access transformer entry: {}", file.fileName(), p));
+
+			String namespace = FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace();
+			String widener = "accessWidener v2 " + namespace + "\n" + String.join("\n", lines) + "\n";
+			ClassTweakerReader.create(FabricLoaderImpl.INSTANCE.getClassTweaker()).read(widener.getBytes(StandardCharsets.UTF_8), namespace);
+			LOGGER.debug("Applied {} access transformer entries from {}", lines.size(), file.fileName());
+		} catch (IOException | RuntimeException e) {
+			throw ModLoadingFailure.of(file.modsToml().mods().getFirst().modId(), "its access transformers could not be applied", e);
+		}
+	}
+
+	private static byte @Nullable [] classBytes(String internalName) {
+		try {
+			return FabricLauncherBase.getLauncher().getClassByteArray(internalName.replace('/', '.'), false);
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	/** Makes the discovered mods visible through FML's {@code LoadingModList} / {@code ModList} file APIs. */
+	private void publishLoadingModList() {
+		Map<Path, ModFile> byPath = new HashMap<>();
+		List<ModFile> files = new ArrayList<>();
+
+		for (NeoForgeModFile file : modFiles) {
+			ModFile parent = file.parent() == null ? null : byPath.get(file.parent());
+			ModFile modFile = new ModFile(file, parent);
+			byPath.put(file.path(), modFile);
+			files.add(modFile);
+		}
+
+		LoadingModList.steelwool$set(files);
+		modInfos.clear();
+
+		for (ModFile file : files) {
+			for (IModInfo info : file.getModInfos()) {
+				modInfos.put(info.getModId(), (ModInfo) info);
+			}
 		}
 	}
 
@@ -207,7 +338,7 @@ public final class SteelWoolLoader {
 						.filter(s -> mod.modId().equals(subscriberModId(file, s)))
 						.toList();
 
-				FMLModContainer container = new FMLModContainer(new SteelWoolModInfo(mod, file), entrypoints, subscribers, classLoader, dist);
+				FMLModContainer container = new FMLModContainer(modInfos.get(mod.modId()), entrypoints, subscribers, classLoader, dist);
 				containers.add(container);
 				ModList.get().steelwool$add(container);
 			}
@@ -222,13 +353,58 @@ public final class SteelWoolLoader {
 
 		dispatchLifecycle("construct", FMLConstructModEvent::new);
 		SteelWoolConfigs.loadAll();
+		fireNewRegistryEvent();
 		fireRegisterEvents();
+		fireEntityAttributeCreation();
 		dispatchLifecycle("common setup", FMLCommonSetupEvent::new);
+		postToAllModBuses(new RegisterPayloadHandlersEvent());
+		postToAllModBuses(construct(RegisterCapabilitiesEvent.class));
 
 		if (!containers.isEmpty()) {
 			LOGGER.info("Constructed and registered {} NeoForge mod(s)", containers.size());
 		}
 	}
+
+	/**
+	 * Adds NeoForge's own registries, then lets mods add theirs. Both go into the root registry before
+	 * registration, so {@code RegisterEvent} fires for them too. Then lets mods add datapack registries.
+	 */
+	private void fireNewRegistryEvent() {
+		callHidden(NewRegistryEvent.class, null, "registerNeoForgeRegistries");
+		NeoForgeBuiltIns.register();
+		NewRegistryEvent event = construct(NewRegistryEvent.class);
+		postToAllModBuses(event);
+		callHidden(NewRegistryEvent.class, event, "fill");
+
+		NewDatapackRegistryEvent datapackEvent = construct(NewDatapackRegistryEvent.class);
+		postToAllModBuses(datapackEvent);
+		callHidden(NewDatapackRegistryEvent.class, datapackEvent, "process");
+	}
+
+	/** Calls a package-private no-argument method of a NeoForge API class (NeoForge calls it from its own package). */
+	private static void callHidden(Class<?> owner, @Nullable Object target, String name) {
+		try {
+			var method = owner.getDeclaredMethod(name);
+			method.setAccessible(true);
+			method.invoke(target);
+		} catch (java.lang.reflect.InvocationTargetException e) {
+			throw e.getCause() instanceof RuntimeException runtime ? runtime : new IllegalStateException(e.getCause());
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	/** Creates an event whose NeoForge constructor is package-private (NeoForge fires it from its own package). */
+	private static <T> T construct(Class<T> type) {
+		try {
+			var constructor = type.getDeclaredConstructor();
+			constructor.setAccessible(true);
+			return constructor.newInstance();
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
 
 	/** Same rule as FML: explicit {@code modid}, else the {@code @Mod} of the same class, else the jar's first mod. */
 	private static String subscriberModId(NeoForgeModFile file, AnnotationScanResult.SubscriberClass subscriber) {
@@ -259,6 +435,13 @@ public final class SteelWoolLoader {
 				post(container, event);
 			}
 		}
+	}
+
+	/** Collects mods' default entity attributes and registers them with Fabric. */
+	private void fireEntityAttributeCreation() {
+		Map<EntityType<? extends LivingEntity>, AttributeSupplier> attributes = new java.util.LinkedHashMap<>();
+		postToAllModBuses(new EntityAttributeCreationEvent(attributes));
+		attributes.forEach(FabricDefaultAttributeRegistry::register);
 	}
 
 	/**
