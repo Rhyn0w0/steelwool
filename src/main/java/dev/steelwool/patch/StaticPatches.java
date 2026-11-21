@@ -30,6 +30,11 @@ public final class StaticPatches {
 		return info;
 	}
 
+	/** The holder for {@code ItemStackTemplate(Item, count, patch)}, which NeoForge adds next to the holder version. */
+	public static net.minecraft.core.Holder<net.minecraft.world.item.Item> itemHolder(net.minecraft.world.item.Item item) {
+		return item.builtInRegistryHolder();
+	}
+
 	/** Valid blocks for NeoForge's {@code BlockEntityType(supplier, Block...)} constructor. */
 	public static Set<Block> blockEntityTypeBlocks(Block[] blocks) {
 		return Set.of(blocks);

@@ -281,6 +281,9 @@ def check(mod: dict, modrinth: Modrinth, base: Path, work: Path, timeout: int, m
     if ignored:
         result["warnings"] = [l.split("]: ", 1)[-1] for l in ignored]
     if state == "done":
+        own = [w for w in result.get("warnings", []) if jars[0].name in w]
+        if own:  # its dependencies loaded, but not the mod itself
+            return result | {"result": "skipped", "reason": "SteelWool did not load the mod: " + own[0].split(": ", 1)[-1]}
         if not any("Found " in l and "NeoForge mod(s)" in l for l in output):
             why = "; ".join(w.split(": ", 1)[-1] for w in result.get("warnings", []))
             return result | {"result": "skipped", "reason": "SteelWool did not load the mod: " + (why or "unknown reason")}

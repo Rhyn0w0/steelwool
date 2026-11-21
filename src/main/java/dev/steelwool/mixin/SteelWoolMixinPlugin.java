@@ -61,10 +61,15 @@ public final class SteelWoolMixinPlugin implements IMixinConfigPlugin {
 	}
 
 	/**
-	 * A constructor to add: {@code descriptor} calls the existing constructor {@code target} with its
-	 * first {@code kept} arguments plus {@code adapter(remaining arguments)} from StaticPatches.
+	 * A constructor to add: {@code descriptor} calls the existing constructor {@code target} with its own
+	 * arguments, except that arguments {@code from} (inclusive) to {@code to} (exclusive) are replaced by
+	 * {@code adapter(those arguments)} from StaticPatches.
 	 */
-	record Constructor(String descriptor, int kept, String adapter, String target) {
+	record Constructor(String descriptor, int from, int to, String adapter, String target) {
+		/** Keeps the first {@code kept} arguments and turns the rest (possibly none) into the target's last argument. */
+		Constructor(String descriptor, int kept, String adapter, String target) {
+			this(descriptor, kept, Type.getArgumentTypes(descriptor).length, adapter, target);
+		}
 	}
 
 	/** A copy of {@code name}/{@code descriptor} as {@code newName}/{@code newDescriptor}; see the class comment. */
@@ -143,7 +148,10 @@ public final class SteelWoolMixinPlugin implements IMixinConfigPlugin {
 					new Constructor("(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;Z)V", 1, "blockEntityTypeBlocks", "(" + BLOCK_ENTITY_SUPPLIER + "Ljava/util/Set;)V")),
 			"net.minecraft.world.level.saveddata.SavedDataType", List.of(
 					new Constructor("(Lnet/minecraft/resources/Identifier;Ljava/util/function/Supplier;Lcom/mojang/serialization/Codec;)V", 3, "noDataFixType",
-							"(Lnet/minecraft/resources/Identifier;Ljava/util/function/Supplier;Lcom/mojang/serialization/Codec;Lnet/minecraft/util/datafix/DataFixTypes;)V")));
+							"(Lnet/minecraft/resources/Identifier;Ljava/util/function/Supplier;Lcom/mojang/serialization/Codec;Lnet/minecraft/util/datafix/DataFixTypes;)V")),
+			"net.minecraft.world.item.ItemStackTemplate", List.of(
+					new Constructor("(Lnet/minecraft/world/item/Item;ILnet/minecraft/core/component/DataComponentPatch;)V", 0, 1, "itemHolder",
+							"(Lnet/minecraft/core/Holder;ILnet/minecraft/core/component/DataComponentPatch;)V")));
 
 	@Override
 	public void onLoad(String mixinPackage) {
@@ -535,23 +543,30 @@ public final class SteelWoolMixinPlugin implements IMixinConfigPlugin {
 	static MethodNode constructor(String owner, Constructor constructor) {
 		MethodNode node = new MethodNode(Opcodes.ACC_PUBLIC, "<init>", constructor.descriptor(), null, null);
 		Type[] args = Type.getArgumentTypes(constructor.descriptor());
+		Type[] targetArgs = Type.getArgumentTypes(constructor.target());
 		node.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
 		int slot = 1;
 		StringBuilder adapterArgs = new StringBuilder("(");
 
-		for (int i = 0; i < args.length; i++) {
+		for (int i = 0; i <= args.length; i++) {
+			if (i == constructor.to()) {
+				// The adapter turns the arguments from..to into the target's argument at position from.
+				String adapterDescriptor = adapterArgs + ")" + targetArgs[constructor.from()].getDescriptor();
+				node.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, FORWARD_OWNER, constructor.adapter(), adapterDescriptor, false));
+			}
+
+			if (i == args.length) {
+				break;
+			}
+
 			node.instructions.add(new VarInsnNode(args[i].getOpcode(Opcodes.ILOAD), slot));
 			slot += args[i].getSize();
 
-			if (i >= constructor.kept()) {
+			if (i >= constructor.from() && i < constructor.to()) {
 				adapterArgs.append(args[i].getDescriptor());
 			}
 		}
 
-		// The adapter turns the arguments after the kept ones (possibly none) into the target's last argument.
-		Type[] targetArgs = Type.getArgumentTypes(constructor.target());
-		String adapterDescriptor = adapterArgs + ")" + targetArgs[targetArgs.length - 1].getDescriptor();
-		node.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, FORWARD_OWNER, constructor.adapter(), adapterDescriptor, false));
 		node.instructions.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, owner, "<init>", constructor.target(), false));
 		node.instructions.add(new InsnNode(Opcodes.RETURN));
 		node.maxLocals = slot;

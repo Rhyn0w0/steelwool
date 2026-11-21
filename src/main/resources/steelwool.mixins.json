@@ -31,6 +31,7 @@
 		"patch.IngredientMixin",
 		"patch.ItemPropertiesMixin",
 		"patch.ItemStackMixin",
+		"patch.ItemStackTemplateMixin",
 		"patch.LevelAttachmentMixin",
 		"patch.LevelMixin",
 		"patch.LevelSetBlockMixin",

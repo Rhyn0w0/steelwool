@@ -91,4 +91,26 @@ class SteelWoolMixinPluginTest {
 		assertEquals("lookup", call.name);
 		verify(method);
 	}
+
+	@Test
+	void constructorAdaptsTheGivenArguments() {
+		var constructor = new SteelWoolMixinPlugin.Constructor("(Lpkg/Item;ILpkg/Patch;)V", 0, 1, "itemHolder", "(Lpkg/Holder;ILpkg/Patch;)V");
+		MethodNode method = SteelWoolMixinPlugin.constructor("pkg/Template", constructor);
+
+		List<MethodInsnNode> calls = calls(method);
+		assertEquals("itemHolder(Lpkg/Item;)Lpkg/Holder;", calls.get(0).name + calls.get(0).desc);
+		assertEquals("<init>(Lpkg/Holder;ILpkg/Patch;)V", calls.get(1).name + calls.get(1).desc);
+		List<Integer> loads = StreamSupport.stream(method.instructions.spliterator(), false)
+				.filter(VarInsnNode.class::isInstance).map(i -> ((VarInsnNode) i).var).toList();
+		assertEquals(List.of(0, 1, 2, 3), loads);
+		// The adapter call comes right after the first argument is loaded.
+		assertEquals(calls.get(0), method.instructions.get(2));
+	}
+
+	@Test
+	void constructorKeepsLeadingArgumentsAndAdaptsTheRest() {
+		var constructor = new SteelWoolMixinPlugin.Constructor("(Lpkg/A;Z[Lpkg/B;)V", 1, "adapt", "(Lpkg/A;Ljava/util/Set;)V");
+		List<MethodInsnNode> calls = calls(SteelWoolMixinPlugin.constructor("pkg/T", constructor));
+		assertEquals("adapt(Z[Lpkg/B;)Ljava/util/Set;", calls.get(0).name + calls.get(0).desc);
+	}
 }

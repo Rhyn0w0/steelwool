@@ -2,6 +2,7 @@ package dev.steelwool.discovery;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -12,8 +13,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.jar.Manifest;
 import java.util.stream.Stream;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -28,10 +34,11 @@ public final class NeoForgeModDiscovery {
 	static final String LEGACY_FORGE_TOML = "META-INF/mods.toml";
 	static final String JARJAR_DIR = "META-INF/jarjar";
 	/**
-	 * Language loaders SteelWool can run. Kotlin for Forge's loader works like {@code javafml}, except that
-	 * a Kotlin {@code object} mod class is used through its {@code INSTANCE} field.
+	 * Language loaders SteelWool can run. The Kotlin loaders (Kotlin for Forge's {@code kotlinforforge} and
+	 * KotlinLangForge's {@code klf}) work like {@code javafml}, except that a Kotlin {@code object} mod class
+	 * is used through its {@code INSTANCE} field.
 	 */
-	static final List<String> SUPPORTED_LOADERS = List.of("javafml", "kotlinforforge");
+	static final List<String> SUPPORTED_LOADERS = List.of("javafml", "kotlinforforge", "klf");
 
 	private final Path jarJarCache;
 
@@ -147,7 +154,11 @@ public final class NeoForgeModDiscovery {
 		}
 	}
 
-	/** Extracts {@code META-INF/jarjar/*.jar}, sorting them into NeoForge mods and plain libraries. */
+	/**
+	 * Extracts the jars bundled inside a jar, sorting them into NeoForge mods and plain libraries. Like NeoForge,
+	 * it reads them from the {@code path}s in {@code META-INF/jarjar/metadata.json}, which may point anywhere in the
+	 * jar (KotlinLangForge uses {@code META-INF/jars/}). Jars directly in {@code META-INF/jarjar/} are included too.
+	 */
 	private void extractJarJar(Path jar, Path root, List<Path> nestedMods, List<Path> libraries) throws IOException {
 		Path jarJar = root.resolve(JARJAR_DIR);
 
@@ -155,16 +166,50 @@ public final class NeoForgeModDiscovery {
 			return;
 		}
 
-		try (Stream<Path> nested = Files.list(jarJar)) {
-			for (Path inner : (Iterable<Path>) nested.filter(p -> p.toString().endsWith(".jar")).sorted()::iterator) {
-				Path extracted = extract(jar, inner);
+		Set<Path> inners = new TreeSet<>();
 
-				if (containsModsToml(extracted)) {
-					nestedMods.add(extracted);
-				} else {
-					libraries.add(extracted);
-				}
+		for (String path : jarJarMetadataPaths(jarJar.resolve("metadata.json"))) {
+			Path inner = root.resolve(path);
+
+			if (Files.isRegularFile(inner)) {
+				inners.add(inner);
+			} else {
+				LOGGER.warn("{} lists the nested jar {}, which it does not contain", jar.getFileName(), path);
 			}
+		}
+
+		try (Stream<Path> nested = Files.list(jarJar)) {
+			nested.filter(p -> p.toString().endsWith(".jar")).forEach(inners::add);
+		}
+
+		for (Path inner : inners) {
+			Path extracted = extract(jar, inner);
+
+			if (containsModsToml(extracted)) {
+				nestedMods.add(extracted);
+			} else {
+				libraries.add(extracted);
+			}
+		}
+	}
+
+	/** The {@code jars[].path} entries of a jar-in-jar {@code metadata.json}, or none if it is missing or unreadable. */
+	static List<String> jarJarMetadataPaths(Path metadata) {
+		if (!Files.exists(metadata)) {
+			return List.of();
+		}
+
+		try (Reader reader = Files.newBufferedReader(metadata)) {
+			List<String> paths = new ArrayList<>();
+
+			for (JsonElement entry : JsonParser.parseReader(reader).getAsJsonObject().getAsJsonArray("jars")) {
+				paths.add(entry.getAsJsonObject().get("path").getAsString());
+			}
+
+			return paths;
+		} catch (IOException | RuntimeException e) {
+			LOGGER.warn("Could not read {}: {}", metadata, e.toString());
+			return List.of();
 		}
 	}
 

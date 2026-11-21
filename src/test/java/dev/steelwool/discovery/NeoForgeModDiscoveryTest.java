@@ -115,6 +115,26 @@ class NeoForgeModDiscoveryTest {
 	}
 
 	@Test
+	void extractsJarsListedInJarJarMetadata() throws IOException {
+		Path mods = Files.createDirectory(temp.resolve("neoforge"));
+		byte[] library = jar(Map.of("kotlin/Lib.class", new byte[0]), null);
+		byte[] metadata = """
+				{"jars": [{"identifier": {"group": "org.jetbrains.kotlin", "artifact": "kotlin-stdlib"},
+				  "version": {"range": "[2.0,)", "artifactVersion": "2.0"}, "path": "META-INF/jars/kotlin-stdlib.jar"}]}
+				""".getBytes(StandardCharsets.UTF_8);
+		Map<String, byte[]> entries = new LinkedHashMap<>();
+		entries.put("META-INF/neoforge.mods.toml", modsToml("outer"));
+		entries.put("META-INF/jarjar/metadata.json", metadata);
+		entries.put("META-INF/jars/kotlin-stdlib.jar", library);
+		write(mods.resolve("outer.jar"), jar(entries, "1.0"));
+
+		var result = new NeoForgeModDiscovery(temp.resolve("cache")).discover(mods);
+
+		NeoForgeModFile outer = result.mods().getFirst();
+		assertEquals(List.of("kotlin-stdlib.jar"), outer.libraries().stream().map(p -> p.getFileName().toString()).toList());
+	}
+
+	@Test
 	void skipsUnsupportedLoaders() throws IOException {
 		Path mods = Files.createDirectory(temp.resolve("neoforge"));
 		byte[] toml = "modLoader=\"lowcodefml\"\n[[mods]]\nmodId=\"low\"\n".getBytes(StandardCharsets.UTF_8);
@@ -127,14 +147,17 @@ class NeoForgeModDiscoveryTest {
 	}
 
 	@Test
-	void loadsKotlinForForgeMods() throws IOException {
+	void loadsKotlinMods() throws IOException {
 		Path mods = Files.createDirectory(temp.resolve("neoforge"));
-		byte[] toml = "modLoader=\"kotlinforforge\"\n[[mods]]\nmodId=\"kt\"\n".getBytes(StandardCharsets.UTF_8);
-		write(mods.resolve("kt.jar"), jar(Map.of("META-INF/neoforge.mods.toml", toml), null));
+
+		for (String loader : List.of("kotlinforforge", "klf")) {
+			byte[] toml = ("modLoader=\"" + loader + "\"\n[[mods]]\nmodId=\"" + loader + "_mod\"\n").getBytes(StandardCharsets.UTF_8);
+			write(mods.resolve(loader + ".jar"), jar(Map.of("META-INF/neoforge.mods.toml", toml), null));
+		}
 
 		var result = new NeoForgeModDiscovery(temp.resolve("cache")).discover(mods);
 
-		assertEquals(List.of("kt"), result.mods().stream().map(f -> f.modsToml().mods().getFirst().modId()).toList());
+		assertEquals(List.of("kotlinforforge_mod", "klf_mod"), result.mods().stream().map(f -> f.modsToml().mods().getFirst().modId()).sorted(java.util.Comparator.reverseOrder()).toList());
 	}
 
 	@Test
