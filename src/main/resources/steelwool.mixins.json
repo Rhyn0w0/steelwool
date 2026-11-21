@@ -5,6 +5,7 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"BuiltInPackSourceMixin",
+		"HopperBlockEntityAccessor",
 		"MinecraftServerThreadMixin",
 		"MinecraftServerTickMixin",
 		"PlayerTickMixin",
@@ -14,9 +15,12 @@
 		"patch.AnvilMenuMixin",
 		"patch.ArgumentTypeInfosMixin",
 		"patch.BlockEntityAttachmentMixin",
+		"patch.BlockMixin",
 		"patch.BlockEntityTypeMixin",
+		"patch.BlockStateMixin",
 		"patch.BlockTransformerMixin",
 		"patch.ChestBlockEntityMixin",
+		"patch.ChunkMapMixin",
 		"patch.ChunkAccessAttachmentMixin",
 		"patch.CreativeModeTabBuilderMixin",
 		"patch.CreativeModeTabMixin",
@@ -37,7 +41,8 @@
 		"patch.RegistryMixin",
 		"patch.ReloadableServerResourcesMixin",
 		"patch.SavedDataStorageMixin",
-		"patch.SavedDataTypeMixin"
+		"patch.SavedDataTypeMixin",
+		"patch.ServerGamePacketListenerImplMixin"
 	],
 	"client": [
 		"client.ClientCommonPacketListenerImplMixin"

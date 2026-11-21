@@ -5,9 +5,9 @@
   "mods": [
     { "slug": "cloth-config", "expect": "pass" },
     { "slug": "ferrite-core", "expect": "pass" },
-    { "slug": "lithium", "expect": "unknown" },
+    { "slug": "lithium", "expect": "pass" },
     { "slug": "yacl", "expect": "pass" },
-    { "slug": "architectury-api", "expect": "unknown" },
+    { "slug": "architectury-api", "expect": "pass" },
     { "slug": "veinminer", "expect": "pass" },
     { "slug": "appleskin", "expect": "pass" },
     { "slug": "jei", "expect": "pass" },

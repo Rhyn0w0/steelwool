@@ -58,12 +58,25 @@ public final class StaticPatches {
 		return net.minecraft.core.Holder.direct(transformer);
 	}
 
+	/** Always false: guards calls {@code SteelWoolMixinPlugin} adds only so mods' mixins can target them. */
+	public static boolean NEVER = false;
+
 	/**
 	 * {@code HopperBlockEntity.getContainerOrHandlerAt(level, pos, side)}: the vanilla container at
 	 * {@code pos}; SteelWool does not look up item handler capabilities here.
 	 */
 	public static net.neoforged.neoforge.transfer.item.ContainerOrHandler hopperGetContainerOrHandlerAt(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos, net.minecraft.core.Direction side) {
-		net.minecraft.world.Container container = net.minecraft.world.level.block.entity.HopperBlockEntity.getContainerAt(level, pos);
+		return hopperGetContainerOrHandlerAt(level, pos, level.getBlockState(pos), pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, side);
+	}
+
+	/**
+	 * {@code HopperBlockEntity.getContainerOrHandlerAt(level, pos, state, x, y, z, side)}: the vanilla
+	 * container of the block at {@code pos} or of an entity at {@code x, y, z}; SteelWool does not look
+	 * up item handler capabilities here.
+	 */
+	public static net.neoforged.neoforge.transfer.item.ContainerOrHandler hopperGetContainerOrHandlerAt(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+			net.minecraft.world.level.block.state.BlockState state, double x, double y, double z, net.minecraft.core.@org.jspecify.annotations.Nullable Direction side) {
+		net.minecraft.world.Container container = dev.steelwool.mixin.HopperBlockEntityAccessor.steelwool$getContainerAt(level, pos, state, x, y, z);
 		return container != null ? new net.neoforged.neoforge.transfer.item.ContainerOrHandler(container, null) : net.neoforged.neoforge.transfer.item.ContainerOrHandler.EMPTY;
 	}
 
@@ -76,5 +89,28 @@ public final class StaticPatches {
 				return name;
 			}
 		};
+	}
+
+	/** The player argument NeoForge's pick-block handler passes to {@code BlockState.getCloneItemStack}. */
+	public static net.minecraft.world.entity.player.Player serverGamePacketListenerPlayer(net.minecraft.server.network.ServerGamePacketListenerImpl listener) {
+		return listener.player;
+	}
+
+	private static final ThreadLocal<net.minecraft.world.item.@org.jspecify.annotations.Nullable ItemStack> STASHED_CLONE_ITEM_STACK = new ThreadLocal<>();
+
+	/** Keeps vanilla's pick-block result (after Fabric API's event) for {@link #stashedCloneItemStack}. */
+	public static void stashCloneItemStack(net.minecraft.world.item.ItemStack stack) {
+		STASHED_CLONE_ITEM_STACK.set(stack);
+	}
+
+	/** Forgets the stashed pick-block result once NeoForge's call returns. */
+	public static net.minecraft.world.item.ItemStack finishCloneItemStack(net.minecraft.world.item.ItemStack stack) {
+		STASHED_CLONE_ITEM_STACK.remove();
+		return stack;
+	}
+
+	/** The pick-block result vanilla's call produced in the handler that is running, or null outside it. */
+	public static net.minecraft.world.item.@org.jspecify.annotations.Nullable ItemStack stashedCloneItemStack() {
+		return STASHED_CLONE_ITEM_STACK.get();
 	}
 }

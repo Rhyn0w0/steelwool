@@ -30,8 +30,8 @@ public abstract class ChunkDataEvent extends ChunkEvent<ChunkAccess> {
 		private final ChunkType status;
 
 		public Load(ChunkAccess arg0, SerializableChunkData arg1) {
-			super((ChunkAccess) null, (SerializableChunkData) null);
-			throw new UnsupportedOperationException("SteelWool does not implement the ChunkDataEvent.Load constructor yet");
+			super(arg0, arg1);
+			this.status = arg0.getPersistedStatus().getChunkType();
 		}
 
 		public ChunkType getType() {
