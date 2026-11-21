@@ -23,13 +23,13 @@ Fabric only scans the top level of `mods/`, so it never sees the jars in `mods/n
 
 ## Status
 
-**Version 0.1.0: first working version.** It targets **Minecraft 26.3**, Fabric Loader 0.20.1+, Fabric API and NeoForge **26.3.0.x** mods. It needs Java 25.
+**Version 0.2.0.** All 35 mods in the compat list start, one at a time and together. It targets **Minecraft 26.3**, Fabric Loader 0.20.1+, Fabric API and NeoForge **26.3.0.x** mods. It needs Java 25.
 
 Verified:
 
 - NeoForge's official example mod (the [26.3 MDK](https://github.com/NeoForgeMDKs/MDK-26.3-ModDevGradle)), built unmodified with NeoForge's own tooling, loads and runs on a Fabric dedicated server. This covers its block, item, creative tab, config file, common setup and server-starting event.
 - The project's test mod ([`testmod/`](testmod/)) passes 18 automated in-game tests on a dedicated server: registration (including a custom registry), lifecycle events, game events, permissions, block capabilities, data attachments, `@EventBusSubscriber`, config, data packs, commands, mod file metadata, payload registration and a mixin from the NeoForge mod.
-- The built `steelwool-0.1.0.jar` works in a real (non-development) Fabric server install.
+- The built `steelwool-0.2.0.jar` works in a real (non-development) Fabric server install. The compat check runs it in one.
 - All 35 popular NeoForge mods in the compat list start on a dedicated server: Cloth Config, Vein Miner, No Chat Reports, Kotlin for Forge, FerriteCore, GeckoLib, AppleSkin, JEI, Clumps, Simple Voice Chat, Nature's Compass, spark, Chunky, YACL, Forge Config API Port, FallingTree, Collective, Carry On, Jade, Puzzles Lib, Balm, Bookshelf, Tom's Simple Storage, TerraBlender, Biomes O' Plenty, Curios, Waystones, Traveler's Backpack, Sophisticated Backpacks, Lootr, JourneyMap, GraveStone, Applied Energistics 2, Lithium and Architectury API. They start both one at a time and all together on one server (47 mods with their dependencies). "Start" means the server finishes starting with the mod loaded; it does not mean every feature of the mod works. See [Compatibility with real mods](#compatibility-with-real-mods).
 
 Not yet verified: the client. SteelWool loads NeoForge mods and their resource packs on the client, but the automated client test (`runClientGameTest`) could not render a window in the environment where it was developed.
